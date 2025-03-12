@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useState } from 'react';
 import { toast } from "sonner";
 import { useAuth } from './AuthContext';
+import { getApiUrl } from '@/utils/environments';
 
 // Define session type based on GameBench API
 export interface Session {
@@ -118,14 +118,13 @@ const defaultSearchParams: SessionSearchParams = {
 };
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { apiToken, companyId } = useAuth();
+  const { apiToken, environment } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalSessions, setTotalSessions] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [searchParams, setSearchParams] = useState<SessionSearchParams>(defaultSearchParams);
 
-  // Real implementation to fetch sessions from GameBench API
   const fetchSessions = async (params?: SessionSearchParams) => {
     if (!apiToken) {
       toast.error('API Token is required');
@@ -138,24 +137,21 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const mergedParams = { ...searchParams, ...params };
       setSearchParams(mergedParams);
       
-      // This would be a real API call in production
-      const response = await fetch('https://api.gamebench.net/v1/sessions', {
+      const response = await fetch(`${getApiUrl(environment)}/sessions`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiToken}`,
           'Content-Type': 'application/json'
         },
-        // Add query parameters here based on mergedParams
       });
       
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
       }
       
-      // Since we're not actually calling the API, we'll set empty sessions
-      // In a real implementation, you would parse the response JSON
-      setSessions([]);
-      setTotalSessions(0);
+      const data = await response.json();
+      setSessions(data.sessions || []);
+      setTotalSessions(data.total || 0);
       setCurrentPage(mergedParams.page || 0);
       
       toast.success('Sessions loaded successfully');
@@ -183,7 +179,6 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSearchParams(defaultSearchParams);
   };
 
-  // Real implementation to fetch session metrics
   const fetchSessionMetrics = async (sessionId: string): Promise<SessionMetrics | null> => {
     if (!apiToken) {
       toast.error('API Token is required');
@@ -191,8 +186,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      // This would be a real API call in production
-      const response = await fetch(`https://api.gamebench.net/v1/sessions/${sessionId}`, {
+      const response = await fetch(`${getApiUrl(environment)}/sessions/${sessionId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiToken}`,
@@ -204,10 +198,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         throw new Error(`API request failed with status ${response.status}`);
       }
       
-      // Since we're not actually calling the API, we'll return null
-      // In a real implementation, you would parse the response JSON
-      toast.error('Session metrics API is not implemented in this demo');
-      return null;
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('Error fetching session metrics:', error);
       toast.error('Failed to fetch session metrics');

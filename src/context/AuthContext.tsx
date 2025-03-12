@@ -1,14 +1,21 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
+import { getApiUrl } from '@/utils/environments';
 
 interface AuthState {
   apiToken: string;
   companyId: string;
   username: string;
+  environment: string;
   isAuthenticated: boolean;
   isValidating: boolean;
-  saveCredentials: (credentials: { apiToken: string; companyId: string; username: string }) => void;
+  saveCredentials: (credentials: { 
+    apiToken: string; 
+    companyId: string; 
+    username: string;
+    environment: string;
+  }) => void;
   validateCredentials: () => Promise<boolean>;
   logout: () => void;
 }
@@ -29,21 +36,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [apiToken, setApiToken] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [username, setUsername] = useState('');
+  const [environment, setEnvironment] = useState('https://api.gamebench.net');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
 
-  // Load credentials from localStorage on mount
   useEffect(() => {
     const savedCredentials = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (savedCredentials) {
       try {
-        const { apiToken, companyId, username } = JSON.parse(savedCredentials);
+        const { apiToken, companyId, username, environment } = JSON.parse(savedCredentials);
         setApiToken(apiToken || '');
         setCompanyId(companyId || '');
         setUsername(username || '');
-        
-        // We don't automatically validate here - user must click connect
-        // This prevents unwanted API calls on page load
+        setEnvironment(environment || 'https://api.gamebench.net');
       } catch (error) {
         console.error('Failed to parse saved credentials:', error);
         localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -51,15 +56,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const saveCredentials = ({ apiToken, companyId, username }: { apiToken: string; companyId: string; username: string }) => {
+  const saveCredentials = ({ 
+    apiToken, 
+    companyId, 
+    username, 
+    environment 
+  }: { 
+    apiToken: string; 
+    companyId: string; 
+    username: string;
+    environment: string;
+  }) => {
     setApiToken(apiToken);
     setCompanyId(companyId);
     setUsername(username);
+    setEnvironment(environment);
     
-    // Save to localStorage
     localStorage.setItem(
       LOCAL_STORAGE_KEY,
-      JSON.stringify({ apiToken, companyId, username })
+      JSON.stringify({ apiToken, companyId, username, environment })
     );
   };
 
@@ -72,8 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsValidating(true);
     
     try {
-      // Make a real API call to validate credentials
-      const response = await fetch('https://api.gamebench.net/v1/me', {
+      const response = await fetch(`${getApiUrl(environment)}/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiToken}`,
@@ -88,7 +102,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setIsAuthenticated(false);
         
-        // Provide more specific error messages based on response status
         if (response.status === 401) {
           toast.error('Invalid API credentials - Authentication failed');
         } else if (response.status === 403) {
@@ -113,6 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setApiToken('');
     setCompanyId('');
     setUsername('');
+    setEnvironment('https://api.gamebench.net');
     setIsAuthenticated(false);
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     toast.info('Logged out successfully');
@@ -124,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         apiToken,
         companyId,
         username,
+        environment,
         isAuthenticated,
         isValidating,
         saveCredentials,

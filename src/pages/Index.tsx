@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -12,16 +11,25 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from '@/context/AuthContext';
 import { Shield, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { environments } from '@/utils/environments';
 
 const Index = () => {
   const navigate = useNavigate();
   const { 
     apiToken, 
     companyId, 
-    username, 
+    username,
+    environment: savedEnvironment,
     isAuthenticated, 
     isValidating, 
     saveCredentials, 
@@ -31,6 +39,7 @@ const Index = () => {
   const [localApiToken, setLocalApiToken] = useState(apiToken);
   const [localCompanyId, setLocalCompanyId] = useState(companyId);
   const [localUsername, setLocalUsername] = useState(username);
+  const [localEnvironment, setLocalEnvironment] = useState(savedEnvironment);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>(
     isAuthenticated ? 'success' : 'idle'
   );
@@ -44,7 +53,8 @@ const Index = () => {
     saveCredentials({
       apiToken: localApiToken,
       companyId: localCompanyId,
-      username: localUsername
+      username: localUsername,
+      environment: localEnvironment
     });
     
     const validated = await validateCredentials();
@@ -78,6 +88,28 @@ const Index = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="environment">Environment</Label>
+            <Select 
+              value={localEnvironment} 
+              onValueChange={setLocalEnvironment}
+            >
+              <SelectTrigger id="environment">
+                <SelectValue placeholder="Select environment" />
+              </SelectTrigger>
+              <SelectContent>
+                {environments.map((env) => (
+                  <SelectItem key={env.baseUrl} value={env.baseUrl}>
+                    {env.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Select the GameBench environment you want to connect to.
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="api-token">API Token (Required)</Label>
             <Input
