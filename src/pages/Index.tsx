@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -105,8 +106,8 @@ const Index = () => {
               <SelectContent className="bg-gray-800 border-gray-700">
                 {environments.map((env) => (
                   <SelectItem 
-                    key={env.baseUrl} 
-                    value={env.baseUrl}
+                    key={env.value} 
+                    value={env.value}
                     className="text-white hover:bg-gray-700"
                   >
                     {env.label}
