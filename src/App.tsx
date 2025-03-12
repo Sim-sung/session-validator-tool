@@ -12,7 +12,6 @@ import IndexPage from '@/pages/Index';
 import SessionsPage from '@/pages/Sessions';
 import MetricsPage from '@/pages/Metrics';
 import ValidationPage from '@/pages/Validation';
-import LogsPage from '@/pages/Logs';
 import NotFound from '@/pages/NotFound';
 
 import '@/App.css';
@@ -40,7 +39,6 @@ function App() {
                   <Route path="/sessions" element={<SessionsPage />} />
                   <Route path="/metrics/:sessionId" element={<MetricsPage />} />
                   <Route path="/validation" element={<ValidationPage />} />
-                  <Route path="/logs" element={<LogsPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Layout>
