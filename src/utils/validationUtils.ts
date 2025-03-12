@@ -1,15 +1,15 @@
-
 import { ValidationRule, MetricCondition } from '@/types/validation';
 import { Session } from '@/context/SessionContext';
 
 const getFieldValue = (session: Session, field: string): number | null => {
   // Handle special case fields that require transformations
   switch (field) {
+    // Performance Metrics
     case 'fps.min':
       return session.fpsMin ?? null;
     case 'fps.max':
       return session.fpsMax ?? null;
-    case 'fps.median': 
+    case 'fps.median':
       return session.fpsMedian ?? null;
     case 'fps.stability':
       return session.fpsStability ?? null;
@@ -124,16 +124,7 @@ const getFieldValue = (session: Session, field: string): number | null => {
     case 'session.sessionDate':
       return session.sessionDate ?? null;
     default:
-      // For any fields not explicitly handled, try to access the nested property
-      const parts = field.split('.');
-      let value: any = session;
-      
-      for (const part of parts) {
-        if (value === null || value === undefined) return null;
-        value = value[part];
-      }
-      
-      return typeof value === 'number' ? value : null;
+      return null;
   }
 };
 

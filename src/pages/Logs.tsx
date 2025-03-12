@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useSession } from '@/context/SessionContext';
 import { useAuth } from '@/context/AuthContext';
@@ -421,6 +420,17 @@ const LogsPage: React.FC = () => {
       initial[field.key] = true;
     });
     setVisibleFields(initial);
+  };
+
+  // Function to safely format unknown values for display
+  const formatValue = (value: unknown): React.ReactNode => {
+    if (value === null || value === undefined) {
+      return <span className="text-muted-foreground">N/A</span>;
+    }
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    return String(value);
   };
 
   return (

@@ -10,10 +10,26 @@ export interface Session {
     name: string;
     version: string;
     package: string;
+    packageName?: string;
+    versionCode?: number;
   };
   device: {
     model: string;
     manufacturer: string;
+    batteryCapacity?: number;
+    batteryVoltage?: number;
+    screenWidth?: number;
+    screenHeight?: number;
+    refreshRate?: number;
+    androidVersionRelease?: string;
+    androidSdkInt?: number;
+    cpu?: {
+      name: string;
+      arch: string;
+      numCores: number;
+      maxFreq: number;
+      minFreq: number;
+    };
   };
   metrics?: {
     fps?: {
@@ -30,11 +46,69 @@ export interface Session {
       drain: number;
     };
   };
-  startTime: number;
-  duration: number;
+  // Performance metrics
+  fpsMin?: number;
+  fpsMax?: number;
+  fpsMedian?: number;
+  fpsStability?: number;
+  fpsOnePercentLow?: number;
+  cpuUsageMin?: number;
+  cpuUsageMax?: number;
+  cpuUsageMedian?: number;
+  cpuUsageAvg?: number;
+  totalCpuUsageAvg?: number;
+  gpuUsageMin?: number;
+  gpuUsageMax?: number;
+  gpuUsageMedian?: number;
+  gpuUsageAvg?: number;
+  memUsageMin?: number;
+  memUsageMax?: number;
+  memUsageMedian?: number;
+  memUsageAvg?: number;
+  androidMemUsageMin?: number;
+  androidMemUsageMax?: number;
+  androidMemUsageMedian?: number;
+  androidMemUsageAvg?: number;
+  firstBat?: number;
+  lastBat?: number;
+  powerUsage?: number;
+  mWAvg?: number;
+  mAh?: number;
+  mAAvg?: number;
+  
+  // Janks metrics
+  bigJanksCount?: number;
+  bigJanks10Mins?: number;
+  smallJanksCount?: number;
+  smallJanks10Mins?: number;
+  janksCount?: number;
+  janks10Mins?: number;
+  
+  // App metrics
+  appSize?: number;
+  appCache?: number;
+  appData?: number;
+  appLaunchTimeMs?: number;
+  totalDeviceMemory?: number;
+  
+  // Network metrics
+  networkAppUsage?: {
+    appTotalDataReceived: number;
+    appTotalDataSent: number;
+  };
+  
+  // Session info
+  startTime?: number;
+  duration?: number;
   userEmail: string;
   selected?: boolean;
-  // Adding properties used in Sessions.tsx
+  sessionDate?: number;
+  timePlayed?: number;
+  timePushed?: number;
+  isActive?: boolean;
+  isCharging?: boolean;
+  
+  // UI helper fields
   appName?: string;
   appVersion?: string;
   deviceModel?: string;
@@ -217,11 +291,21 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           app: {
             name: session.app?.name || 'Unknown',
             version: session.app?.version || 'Unknown',
-            package: session.app?.packageName || session.app?.package || 'Unknown'
+            package: session.app?.packageName || session.app?.package || 'Unknown',
+            packageName: session.app?.packageName,
+            versionCode: session.app?.versionCode
           },
           device: {
             model: session.device?.model || 'Unknown',
-            manufacturer: session.device?.manufacturer || 'Unknown'
+            manufacturer: session.device?.manufacturer || 'Unknown',
+            batteryCapacity: session.device?.batteryCapacity,
+            batteryVoltage: session.device?.batteryVoltage,
+            screenWidth: session.device?.screenWidth,
+            screenHeight: session.device?.screenHeight,
+            refreshRate: session.device?.refreshRate,
+            androidVersionRelease: session.device?.androidVersionRelease,
+            androidSdkInt: session.device?.androidSdkInt,
+            cpu: session.device?.cpu
           },
           metrics: {
             fps: {
@@ -247,7 +331,51 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           deviceModel: session.device?.model || 'Unknown',
           manufacturer: session.device?.manufacturer || 'Unknown',
           recordedBy: session.user?.userPlayAccount || session.originalUser?.userPlayAccount || 'Unknown',
-          selected: false
+          selected: false,
+          fpsMin: session.fpsMin,
+          fpsMax: session.fpsMax,
+          fpsMedian: session.fpsMedian,
+          fpsStability: session.fpsStability,
+          fpsOnePercentLow: session.fpsOnePercentLow,
+          cpuUsageMin: session.cpuUsageMin,
+          cpuUsageMax: session.cpuUsageMax,
+          cpuUsageMedian: session.cpuUsageMedian,
+          cpuUsageAvg: session.cpuUsageAvg,
+          totalCpuUsageAvg: session.totalCpuUsageAvg,
+          gpuUsageMin: session.gpuUsageMin,
+          gpuUsageMax: session.gpuUsageMax,
+          gpuUsageMedian: session.gpuUsageMedian,
+          gpuUsageAvg: session.gpuUsageAvg,
+          memUsageMin: session.memUsageMin,
+          memUsageMax: session.memUsageMax,
+          memUsageMedian: session.memUsageMedian,
+          memUsageAvg: session.memUsageAvg,
+          androidMemUsageMin: session.androidMemUsageMin,
+          androidMemUsageMax: session.androidMemUsageMax,
+          androidMemUsageMedian: session.androidMemUsageMedian,
+          androidMemUsageAvg: session.androidMemUsageAvg,
+          firstBat: session.firstBat,
+          lastBat: session.lastBat,
+          powerUsage: session.powerUsage,
+          mWAvg: session.mWAvg,
+          mAh: session.mAh,
+          mAAvg: session.mAAvg,
+          bigJanksCount: session.bigJanksCount,
+          bigJanks10Mins: session.bigJanks10Mins,
+          smallJanksCount: session.smallJanksCount,
+          smallJanks10Mins: session.smallJanks10Mins,
+          janksCount: session.janksCount,
+          janks10Mins: session.janks10Mins,
+          appSize: session.appSize,
+          appCache: session.appCache,
+          appData: session.appData,
+          appLaunchTimeMs: session.appLaunchTimeMs,
+          totalDeviceMemory: session.totalDeviceMemory,
+          sessionDate: session.sessionDate,
+          timePlayed: session.timePlayed,
+          timePushed: session.timePushed,
+          isActive: session.isActive,
+          isCharging: session.isCharging
         }));
         
         setTotalSessions(data.totalHits || data.totalPages || mappedSessions.length);
@@ -258,11 +386,21 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           app: {
             name: session.app?.name || 'Unknown',
             version: session.app?.version || 'Unknown',
-            package: session.app?.package || 'Unknown'
+            package: session.app?.package || 'Unknown',
+            packageName: session.app?.packageName,
+            versionCode: session.app?.versionCode
           },
           device: {
             model: session.device?.model || 'Unknown',
-            manufacturer: session.device?.manufacturer || 'Unknown'
+            manufacturer: session.device?.manufacturer || 'Unknown',
+            batteryCapacity: session.device?.batteryCapacity,
+            batteryVoltage: session.device?.batteryVoltage,
+            screenWidth: session.device?.screenWidth,
+            screenHeight: session.device?.screenHeight,
+            refreshRate: session.device?.refreshRate,
+            androidVersionRelease: session.device?.androidVersionRelease,
+            androidSdkInt: session.device?.androidSdkInt,
+            cpu: session.device?.cpu
           },
           metrics: {
             fps: session.metrics?.fps || undefined,
@@ -279,7 +417,51 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           deviceModel: session.device?.model || 'Unknown',
           manufacturer: session.device?.manufacturer || 'Unknown',
           recordedBy: session.userEmail || 'Unknown',
-          selected: false
+          selected: false,
+          fpsMin: session.metrics?.fps?.[0],
+          fpsMax: session.metrics?.fps?.[1],
+          fpsMedian: session.metrics?.fps?.[2],
+          fpsStability: session.metrics?.fps?.[3],
+          fpsOnePercentLow: session.metrics?.fps?.[4],
+          cpuUsageMin: session.metrics?.cpu?.[0],
+          cpuUsageMax: session.metrics?.cpu?.[1],
+          cpuUsageMedian: session.metrics?.cpu?.[2],
+          cpuUsageAvg: session.metrics?.cpu?.[3],
+          totalCpuUsageAvg: session.metrics?.cpu?.[4],
+          gpuUsageMin: session.metrics?.gpu?.[0],
+          gpuUsageMax: session.metrics?.gpu?.[1],
+          gpuUsageMedian: session.metrics?.gpu?.[2],
+          gpuUsageAvg: session.metrics?.gpu?.[3],
+          memUsageMin: session.metrics?.memory?.[0],
+          memUsageMax: session.metrics?.memory?.[1],
+          memUsageMedian: session.metrics?.memory?.[2],
+          memUsageAvg: session.metrics?.memory?.[3],
+          androidMemUsageMin: session.metrics?.memory?.[4],
+          androidMemUsageMax: session.metrics?.memory?.[5],
+          androidMemUsageMedian: session.metrics?.memory?.[6],
+          androidMemUsageAvg: session.metrics?.memory?.[7],
+          firstBat: session.metrics?.battery?.[0],
+          lastBat: session.metrics?.battery?.[1],
+          powerUsage: session.metrics?.battery?.[2],
+          mWAvg: session.metrics?.battery?.[3],
+          mAh: session.metrics?.battery?.[4],
+          mAAvg: session.metrics?.battery?.[5],
+          bigJanksCount: session.metrics?.battery?.[6],
+          bigJanks10Mins: session.metrics?.battery?.[7],
+          smallJanksCount: session.metrics?.battery?.[8],
+          smallJanks10Mins: session.metrics?.battery?.[9],
+          janksCount: session.metrics?.battery?.[10],
+          janks10Mins: session.metrics?.battery?.[11],
+          appSize: session.metrics?.battery?.[12],
+          appCache: session.metrics?.battery?.[13],
+          appData: session.metrics?.battery?.[14],
+          appLaunchTimeMs: session.metrics?.battery?.[15],
+          totalDeviceMemory: session.metrics?.battery?.[16],
+          sessionDate: session.startTime,
+          timePlayed: session.duration,
+          timePushed: session.startTime,
+          isActive: session.metrics?.battery?.[17],
+          isCharging: session.metrics?.battery?.[18]
         }));
         
         setTotalSessions(data.total || mappedSessions.length);
@@ -295,11 +477,21 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             app: {
               name: session.app?.name || 'Unknown',
               version: session.app?.version || 'Unknown',
-              package: session.app?.packageName || session.app?.package || 'Unknown'
+              package: session.app?.packageName || session.app?.package || 'Unknown',
+              packageName: session.app?.packageName,
+              versionCode: session.app?.versionCode
             },
             device: {
               model: session.device?.model || 'Unknown',
-              manufacturer: session.device?.manufacturer || 'Unknown'
+              manufacturer: session.device?.manufacturer || 'Unknown',
+              batteryCapacity: session.device?.batteryCapacity,
+              batteryVoltage: session.device?.batteryVoltage,
+              screenWidth: session.device?.screenWidth,
+              screenHeight: session.device?.screenHeight,
+              refreshRate: session.device?.refreshRate,
+              androidVersionRelease: session.device?.androidVersionRelease,
+              androidSdkInt: session.device?.androidSdkInt,
+              cpu: session.device?.cpu
             },
             metrics: {
               fps: {
@@ -324,7 +516,51 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
             deviceModel: session.device?.model || 'Unknown',
             manufacturer: session.device?.manufacturer || 'Unknown',
             recordedBy: session.user?.userPlayAccount || session.originalUser?.userPlayAccount || 'Unknown',
-            selected: false
+            selected: false,
+            fpsMin: session.fpsMin,
+            fpsMax: session.fpsMax,
+            fpsMedian: session.fpsMedian,
+            fpsStability: session.fpsStability,
+            fpsOnePercentLow: session.fpsOnePercentLow,
+            cpuUsageMin: session.cpuUsageMin,
+            cpuUsageMax: session.cpuUsageMax,
+            cpuUsageMedian: session.cpuUsageMedian,
+            cpuUsageAvg: session.cpuUsageAvg,
+            totalCpuUsageAvg: session.totalCpuUsageAvg,
+            gpuUsageMin: session.gpuUsageMin,
+            gpuUsageMax: session.gpuUsageMax,
+            gpuUsageMedian: session.gpuUsageMedian,
+            gpuUsageAvg: session.gpuUsageAvg,
+            memUsageMin: session.memUsageMin,
+            memUsageMax: session.memUsageMax,
+            memUsageMedian: session.memUsageMedian,
+            memUsageAvg: session.memUsageAvg,
+            androidMemUsageMin: session.androidMemUsageMin,
+            androidMemUsageMax: session.androidMemUsageMax,
+            androidMemUsageMedian: session.androidMemUsageMedian,
+            androidMemUsageAvg: session.androidMemUsageAvg,
+            firstBat: session.firstBat,
+            lastBat: session.lastBat,
+            powerUsage: session.powerUsage,
+            mWAvg: session.mWAvg,
+            mAh: session.mAh,
+            mAAvg: session.mAAvg,
+            bigJanksCount: session.bigJanksCount,
+            bigJanks10Mins: session.bigJanks10Mins,
+            smallJanksCount: session.smallJanksCount,
+            smallJanks10Mins: session.smallJanks10Mins,
+            janksCount: session.janksCount,
+            janks10Mins: session.janks10Mins,
+            appSize: session.appSize,
+            appCache: session.appCache,
+            appData: session.appData,
+            appLaunchTimeMs: session.appLaunchTimeMs,
+            totalDeviceMemory: session.totalDeviceMemory,
+            sessionDate: session.sessionDate,
+            timePlayed: session.timePlayed,
+            timePushed: session.timePushed,
+            isActive: session.isActive,
+            isCharging: session.isCharging
           }));
           
           setTotalSessions(mappedSessions.length);
