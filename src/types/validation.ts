@@ -71,12 +71,11 @@ export interface Session {
     manufacturer: string;
     batteryCapacity?: number;
     batteryVoltage?: number;
-    screenWidth?: number;
-    screenHeight?: number;
-    refreshRate?: number;
-    androidVersionRelease?: string;
-    androidSdkInt?: number;
-    baseband?: string;
+    screen?: {
+      width: number;
+      height: number;
+      refreshRate: number;
+    };
     gpu?: {
       vendor: string;
       renderer: string;
@@ -86,6 +85,9 @@ export interface Session {
       maxFreq: number;
       minFreq: number;
     };
+    androidVersion?: string;
+    androidSdk?: number;
+    baseband?: string;
   };
   user?: {
     userPlayAccount: string;
@@ -95,49 +97,7 @@ export interface Session {
     githash: string;
     injected: string;
   };
-  fpsMin?: number;
-  fpsMax?: number;
-  fpsMedian?: number;
-  fpsStability?: number;
-  fpsOnePercentLow?: number;
-  cpuUsageMin?: number;
-  cpuUsageMax?: number;
-  cpuUsageMedian?: number;
-  cpuUsageAvg?: number;
-  totalCpuUsageAvg?: number;
-  gpuUsageMin?: number;
-  gpuUsageMax?: number;
-  gpuUsageMedian?: number;
-  gpuUsageAvg?: number;
-  memUsageMin?: number;
-  memUsageMax?: number;
-  memUsageMedian?: number;
-  memUsageAvg?: number;
-  androidMemUsageMin?: number;
-  androidMemUsageMax?: number;
-  androidMemUsageMedian?: number;
-  androidMemUsageAvg?: number;
-  firstBat?: number;
-  lastBat?: number;
-  powerUsage?: number;
-  mWAvg?: number;
-  mAh?: number;
-  mAAvg?: number;
-  bigJanksCount?: number;
-  bigJanks10Mins?: number;
-  smallJanksCount?: number;
-  smallJanks10Mins?: number;
-  janksCount?: number;
-  janks10Mins?: number;
-  appSize?: number;
-  appCache?: number;
-  appData?: number;
-  appLaunchTimeMs?: number;
-  timePlayed?: number;
-  sessionDate?: number;
-  timePushed?: number;
   isActive?: boolean;
-  isCharging?: boolean;
   selected: boolean;
   startTime: number;
   duration: number;
@@ -158,7 +118,7 @@ export interface ValidationRule {
   field: MetricField;
   operator: MetricOperator;
   condition: MetricCondition;
-  value: number | string | boolean | [number, number] | [string, string]; // Support different value types
+  value: number | string | boolean | [number, number] | [string, string];
   enabled: boolean;
   description?: string;
 }
