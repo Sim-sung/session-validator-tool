@@ -1,7 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
-import { getApiUrl } from '@/utils/environments';
+import { getApiUrl, createBasicAuth } from '@/utils/environments';
 
 interface AuthState {
   apiToken: string;
