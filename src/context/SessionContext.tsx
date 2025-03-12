@@ -91,11 +91,12 @@ interface SessionContextType {
   resetSearchParams: () => void;
   fetchSessionMetrics: (sessionId: string) => Promise<SessionMetrics | null>;
   saveSessionMetricsForValidation: (metrics: SessionMetrics) => void;
+  setSessions: (sessions: Session[]) => void; // Added this function
 }
 
-const SessionContext = createContext<SessionContextType | undefined>(undefined);
+// Export the context and its hook
+export const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-// Export useSessionContext as useSession for compatibility
 export const useSession = () => {
   const context = useContext(SessionContext);
   if (!context) {
@@ -285,6 +286,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         resetSearchParams,
         fetchSessionMetrics,
         saveSessionMetricsForValidation,
+        setSessions, // Add this to the context value
       }}
     >
       {children}

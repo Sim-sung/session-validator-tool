@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -68,6 +69,7 @@ const SessionsPage = () => {
     selectAllSessions, 
     setSearchParams, 
     resetSearchParams,
+    setSessions
   } = useSession();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
