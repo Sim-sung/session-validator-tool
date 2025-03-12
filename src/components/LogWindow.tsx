@@ -30,12 +30,18 @@ export const LogWindow = () => {
     const originalFetch = window.fetch;
     
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
+      // Extract URL string properly based on input type
+      const urlString = typeof input === 'string' 
+        ? input 
+        : input instanceof URL 
+          ? input.toString() 
+          : input.url;
+          
       const method = init?.method || 'GET';
       const requestHeaders = init?.headers as Record<string, string>;
       const requestBody = init?.body ? JSON.parse(init.body as string) : undefined;
       
-      console.log(`Sending ${method} request to ${url}`, {
+      console.log(`Sending ${method} request to ${urlString}`, {
         headers: requestHeaders,
         body: requestBody
       });
@@ -51,16 +57,16 @@ export const LogWindow = () => {
           setLogs(prev => [...prev, {
             type: 'network',
             timestamp,
-            data: `${method} ${url} - Status: ${response.status}`,
+            data: `${method} ${urlString} - Status: ${response.status}`,
             method,
-            url,
+            url: urlString,
             status: response.status,
             requestHeaders,
             requestBody,
             responseBody
           }]);
           
-          console.log(`Response from ${method} ${url}:`, {
+          console.log(`Response from ${method} ${urlString}:`, {
             status: response.status,
             body: responseBody
           });
@@ -74,9 +80,9 @@ export const LogWindow = () => {
         setLogs(prev => [...prev, {
           type: 'error',
           timestamp,
-          data: `Failed ${method} request to ${url}: ${error}`,
+          data: `Failed ${method} request to ${urlString}: ${error}`,
           method,
-          url,
+          url: urlString,
           requestHeaders,
           requestBody
         }]);
@@ -139,7 +145,7 @@ export const LogWindow = () => {
       <div className="border border-gray-800 rounded-md p-2 mb-2">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
-            <Badge variant={log.status && log.status < 400 ? "success" : "destructive"}>
+            <Badge variant={log.status && log.status < 400 ? "default" : "destructive"}>
               {log.method}
             </Badge>
             <span className="text-sm truncate max-w-[300px]">{log.url}</span>
