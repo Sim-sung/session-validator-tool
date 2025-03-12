@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Card, 
@@ -21,6 +21,15 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Table, 
   TableBody, 
@@ -37,29 +46,33 @@ import {
   Play, 
   Check, 
   X, 
-  FileDown
+  FileDown,
+  RefreshCw,
+  CalendarIcon
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useSession } from '@/context/SessionContext';
-import { LogWindow } from '@/components/LogWindow';
-import { ValidationRule, MetricField, MetricCondition } from '@/types/validation';
-import { validateRule, getDefaultRules } from '@/utils/validationUtils';
-
-interface ValidationResult {
-  sessionId: string;
-  appName: string;
-  deviceModel: string;
-  rules: {
-    ruleId: string;
-    ruleName: string;
-    passed: boolean;
-    field: string;
-    expectedCondition: string;
-    expectedValue: number | [number, number];
-    description?: string;
-  }[];
-  overallResult: 'pass' | 'fail';
-}
+import { 
+  ValidationRule, 
+  MetricField, 
+  MetricCondition, 
+  MetricOperator,
+  ValidationResult
+} from '@/types/validation';
+import { 
+  validateRule, 
+  getDefaultRules, 
+  getMetricFields, 
+  getConditionsForOperator,
+  getOperatorForField
+} from '@/utils/validationUtils';
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 
 const Validation = () => {
   const navigate = useNavigate();
@@ -73,6 +86,7 @@ const Validation = () => {
   const [newRule, setNewRule] = useState<Omit<ValidationRule, 'id'>>({
     name: '',
     field: 'fps.min',
+    operator: 'number',
     condition: '>=',
     value: 0,
     enabled: true,
@@ -82,12 +96,49 @@ const Validation = () => {
   const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [isValidating, setIsValidating] = useState(false);
+  const [metricFields] = useState(getMetricFields());
+  const [selectedDateRange, setSelectedDateRange] = useState<{ from?: Date; to?: Date }>({});
 
-  React.useEffect(() => {
+  // Create state for between value range
+  const [betweenValues, setBetweenValues] = useState<{ min: number | string; max: number | string }>({
+    min: 0,
+    max: 100
+  });
+
+  // Get conditions based on the selected operator
+  const [conditions, setConditions] = useState<{value: string; label: string}[]>(
+    getConditionsForOperator(newRule.operator)
+  );
+
+  useEffect(() => {
     if (!isAuthenticated) {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
+
+  // Update conditions when operator changes
+  useEffect(() => {
+    setConditions(getConditionsForOperator(newRule.operator));
+    
+    // Reset condition when operator changes
+    setNewRule(prev => {
+      const newConditions = getConditionsForOperator(newRule.operator);
+      return {
+        ...prev,
+        condition: newConditions.length > 0 ? newConditions[0].value as MetricCondition : '>' as MetricCondition
+      };
+    });
+  }, [newRule.operator]);
+
+  // Update operator when field changes
+  const handleFieldChange = (fieldValue: string) => {
+    const operator = getOperatorForField(fieldValue);
+    setNewRule(prev => ({
+      ...prev,
+      field: fieldValue as MetricField,
+      operator
+    }));
+  };
 
   const addRule = () => {
     if (!newRule.name) {
@@ -95,11 +146,30 @@ const Validation = () => {
       return;
     }
     
+    let ruleValue = newRule.value;
+    
+    // Handle 'between' condition
+    if (newRule.condition === 'between') {
+      if (newRule.operator === 'number') {
+        ruleValue = [Number(betweenValues.min), Number(betweenValues.max)];
+      } else if (newRule.operator === 'date') {
+        if (!selectedDateRange.from || !selectedDateRange.to) {
+          toast.error('Please select both start and end dates for the between condition');
+          return;
+        }
+        ruleValue = [
+          selectedDateRange.from.toISOString(),
+          selectedDateRange.to.toISOString()
+        ];
+      }
+    }
+    
     setRules([
       ...rules,
       {
         ...newRule,
-        id: Date.now().toString()
+        id: Date.now().toString(),
+        value: ruleValue
       }
     ]);
     
@@ -107,11 +177,14 @@ const Validation = () => {
     setNewRule({
       name: '',
       field: 'fps.min',
+      operator: 'number',
       condition: '>=',
       value: 0,
       enabled: true,
       description: ''
     });
+    setBetweenValues({ min: 0, max: 100 });
+    setSelectedDateRange({});
     
     toast.success('Rule added successfully');
   };
@@ -169,14 +242,18 @@ const Validation = () => {
         .filter(rule => rule.enabled)
         .map(rule => {
           const passed = validateRule(session, rule);
+          const fieldValue = session[rule.field as keyof typeof session] || 
+                            getNestedProperty(session, rule.field as string);
           
           return {
             ruleId: rule.id,
             ruleName: rule.name,
             passed,
             field: rule.field,
+            operator: rule.operator,
             expectedCondition: rule.condition,
             expectedValue: rule.value,
+            actualValue: fieldValue,
             description: rule.description
           };
         });
@@ -206,9 +283,11 @@ const Validation = () => {
     }
     
     // Format the results as a CSV string
-    const headers = "Session ID,App Name,Device Model,Overall Result\n";
-    const rows = validationResults.map(result => 
-      `${result.sessionId},${result.appName},${result.deviceModel},${result.overallResult.toUpperCase()}`
+    const headers = "Session ID,App Name,Device Model,Rule Name,Rule Field,Rule Condition,Expected Value,Actual Value,Result\n";
+    const rows = validationResults.flatMap(result => 
+      result.rules.map(rule => 
+        `"${result.sessionId}","${result.appName}","${result.deviceModel}","${rule.ruleName}","${rule.field}","${rule.expectedCondition}","${formatValue(rule.expectedValue)}","${formatValue(rule.actualValue)}","${rule.passed ? 'PASS' : 'FAIL'}"`
+      )
     ).join('\n');
     
     const csv = headers + rows;
@@ -227,6 +306,31 @@ const Validation = () => {
     document.body.removeChild(a);
     
     toast.success('Validation results exported successfully');
+  };
+
+  // Helper function to format values for display/export
+  const formatValue = (value: any): string => {
+    if (value === null || value === undefined) {
+      return 'N/A';
+    }
+    
+    if (Array.isArray(value)) {
+      return value.join(' - ');
+    }
+    
+    return String(value);
+  };
+
+  // Helper function to get a nested property from an object using dot notation
+  const getNestedProperty = (obj: any, path: string): any => {
+    if (!obj || !path) return null;
+    const keys = path.split('.');
+    let value = obj;
+    for (const key of keys) {
+      if (value === null || value === undefined) return null;
+      value = value[key];
+    }
+    return value;
   };
   
   return (
@@ -294,56 +398,186 @@ const Validation = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="metric">Metric</Label>
-                  <select 
-                    id="metric"
-                    className="w-full p-2 border rounded"
+                  <Label htmlFor="metric">Metric Field</Label>
+                  <Select 
                     value={newRule.field}
-                    onChange={(e) => setNewRule({...newRule, field: e.target.value as MetricField})}
+                    onValueChange={handleFieldChange}
                   >
-                    <option value="fps.min">FPS (Minimum)</option>
-                    <option value="fps.max">FPS (Maximum)</option>
-                    <option value="fps.median">FPS (Median)</option>
-                    <option value="fps.stability">FPS Stability</option>
-                    <option value="cpu.min">CPU Usage (Minimum)</option>
-                    <option value="cpu.max">CPU Usage (Maximum)</option>
-                    <option value="cpu.avg">CPU Usage (Average)</option>
-                    <option value="androidMemory.avg">Memory Usage (Average)</option>
-                    <option value="androidMemory.max">Memory Usage (Maximum)</option>
-                    <option value="battery.drain">Battery Drain</option>
-                    <option value="power.usage">Power Usage</option>
-                    <option value="app.launchTime">Launch Time</option>
-                    <option value="app.size">App Size</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a metric" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(metricFields).map(([category, fields]) => (
+                        <SelectGroup key={category}>
+                          <SelectLabel>{category}</SelectLabel>
+                          {fields.map(field => (
+                            <SelectItem key={field.value} value={field.value}>
+                              {field.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="condition">Condition</Label>
-                  <select 
-                    id="condition"
-                    className="w-full p-2 border rounded"
+                  <Select
                     value={newRule.condition}
-                    onChange={(e) => setNewRule({...newRule, condition: e.target.value as MetricCondition})}
+                    onValueChange={(value) => setNewRule({...newRule, condition: value as MetricCondition})}
                   >
-                    <option value=">">Greater Than (&gt;)</option>
-                    <option value=">=">Greater Than or Equal (&gt;=)</option>
-                    <option value="<">Less Than (&lt;)</option>
-                    <option value="<=">Less Than or Equal (&lt;=)</option>
-                    <option value="==">Equal To (==)</option>
-                    <option value="!=">Not Equal To (!=)</option>
-                    <option value="between">Between</option>
-                    <option value="exists">Exists</option>
-                    <option value="not_null">Not Null</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conditions.map(condition => (
+                        <SelectItem key={condition.value} value={condition.value}>
+                          {condition.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="value">Value</Label>
+                  {newRule.condition === 'between' ? (
+                    <div className="space-y-2">
+                      <Label>Range Values</Label>
+                      {newRule.operator === 'date' ? (
+                        <div className="flex flex-col space-y-2">
+                          <Label>Date Range</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="justify-start text-left font-normal"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {selectedDateRange.from ? (
+                                  selectedDateRange.to ? (
+                                    <>
+                                      {format(selectedDateRange.from, "LLL dd, y")} -{" "}
+                                      {format(selectedDateRange.to, "LLL dd, y")}
+                                    </>
+                                  ) : (
+                                    format(selectedDateRange.from, "LLL dd, y")
+                                  )
+                                ) : (
+                                  <span>Pick a date range</span>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={selectedDateRange.from}
+                                selected={selectedDateRange}
+                                onSelect={setSelectedDateRange}
+                                numberOfMonths={2}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      ) : (
+                        <div className="flex space-x-2">
+                          <div className="flex-1">
+                            <Label htmlFor="min-value">Min</Label>
+                            <Input 
+                              id="min-value" 
+                              type={newRule.operator === 'number' ? 'number' : 'text'}
+                              value={betweenValues.min}
+                              onChange={(e) => setBetweenValues({...betweenValues, min: e.target.value})}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <Label htmlFor="max-value">Max</Label>
+                            <Input 
+                              id="max-value" 
+                              type={newRule.operator === 'number' ? 'number' : 'text'}
+                              value={betweenValues.max}
+                              onChange={(e) => setBetweenValues({...betweenValues, max: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    newRule.condition === 'exists' || 
+                    newRule.condition === 'notExists' || 
+                    newRule.condition === 'isEmpty' || 
+                    newRule.condition === 'isNotEmpty' ||
+                    newRule.condition === 'isTrue' ||
+                    newRule.condition === 'isFalse' ? (
+                      <div className="pt-6">
+                        <p className="text-sm text-muted-foreground">No value needed for this condition</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Label htmlFor="value">Value</Label>
+                        {newRule.operator === 'boolean' ? (
+                          <Select
+                            value={String(newRule.value)}
+                            onValueChange={(value) => setNewRule({...newRule, value: value === 'true'})}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a value" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="true">True</SelectItem>
+                              <SelectItem value="false">False</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : newRule.operator === 'date' ? (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start text-left font-normal"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {newRule.value instanceof Date ? (
+                                  format(newRule.value as Date, "PP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={new Date(newRule.value as string)}
+                                onSelect={(date) => date && setNewRule({...newRule, value: date.toISOString()})}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          <Input 
+                            id="value" 
+                            type={newRule.operator === 'number' ? 'number' : 'text'}
+                            value={newRule.value as string | number}
+                            onChange={(e) => {
+                              const value = newRule.operator === 'number' 
+                                ? parseFloat(e.target.value) 
+                                : e.target.value;
+                              setNewRule({...newRule, value});
+                            }}
+                          />
+                        )}
+                      </>
+                    )
+                  )}
+                </div>
+                
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="description">Description (Optional)</Label>
                   <Input 
-                    id="value" 
-                    type="number"
-                    value={newRule.value as number}
-                    onChange={(e) => setNewRule({...newRule, value: parseFloat(e.target.value)})}
+                    id="description" 
+                    value={newRule.description || ''}
+                    onChange={(e) => setNewRule({...newRule, description: e.target.value})}
+                    placeholder="Add a description for this rule"
                   />
                 </div>
               </div>
@@ -384,10 +618,15 @@ const Validation = () => {
                           onCheckedChange={(checked) => toggleRuleStatus(rule.id, checked)}
                         />
                       </TableCell>
-                      <TableCell>{rule.name}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{rule.name}</div>
+                        {rule.description && (
+                          <div className="text-xs text-muted-foreground">{rule.description}</div>
+                        )}
+                      </TableCell>
                       <TableCell>{rule.field}</TableCell>
                       <TableCell>{rule.condition}</TableCell>
-                      <TableCell>{rule.value}</TableCell>
+                      <TableCell>{formatValue(rule.value)}</TableCell>
                       <TableCell>
                         <Button variant="destructive" size="sm" onClick={() => deleteRule(rule.id)}>
                           <Trash className="h-4 w-4" />
@@ -469,7 +708,7 @@ const Validation = () => {
               >
                 {isValidating ? (
                   <>
-                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     Validating...
                   </>
                 ) : (
@@ -538,16 +777,11 @@ const Validation = () => {
                           {result.rules.map((rule) => (
                             <TableRow key={rule.ruleId}>
                               <TableCell>{rule.ruleName}</TableCell>
-                              <TableCell>
-                                {rule.ruleName.toLowerCase().includes('fps') ? 'FPS' : 
-                                rule.ruleName.toLowerCase().includes('cpu') ? 'CPU' :
-                                rule.ruleName.toLowerCase().includes('memory') ? 'Memory' :
-                                rule.ruleName.toLowerCase().includes('battery') ? 'Battery' : 'Other'}
-                              </TableCell>
-                              <TableCell>
-                                {rule.expectedCondition} {rule.expectedValue}
-                              </TableCell>
                               <TableCell>{rule.field}</TableCell>
+                              <TableCell>
+                                {rule.expectedCondition} {formatValue(rule.expectedValue)}
+                              </TableCell>
+                              <TableCell>{formatValue(rule.actualValue)}</TableCell>
                               <TableCell>
                                 {rule.passed ? (
                                   <Check className="h-4 w-4 text-green-500" />
@@ -569,8 +803,6 @@ const Validation = () => {
           </Card>
         </TabsContent>
       </Tabs>
-      
-      <LogWindow />
     </div>
   );
 };

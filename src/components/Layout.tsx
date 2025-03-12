@@ -17,7 +17,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setActiveTab(location.pathname);
   }, [location.pathname]);
 
-  // Updated navItems to match the tabs without logs
+  // Updated navItems
   const navItems = [
     {
       value: '/',
@@ -84,8 +84,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     value={item.value}
                     className={cn(
                       "flex items-center justify-center transition-all",
-                      activeTab === item.value || 
-                      (activeTab.startsWith('/metrics') && item.value === '/metrics')
+                      (activeTab === item.value || 
+                      (activeTab.startsWith('/metrics') && item.value === '/metrics') ||
+                      (activeTab === '/sessions' && item.value === '/sessions') ||
+                      (activeTab === '/validation' && item.value === '/validation'))
                         ? "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                         : ""
                     )}

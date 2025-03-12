@@ -47,10 +47,15 @@ import {
   Download, 
   Trash2, 
   Info, 
-  Clock 
+  Clock,
+  Eye,
+  FileDown
 } from 'lucide-react';
-import { LogWindow } from '@/components/LogWindow';
 import { toast } from 'sonner';
+import SortableTableHeader from '@/components/SortableTableHeader';
+
+type SortDirection = 'asc' | 'desc' | null;
+type SortKey = 'appName' | 'deviceModel' | 'recordedBy' | 'startTime' | 'duration';
 
 const formatDuration = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);
@@ -79,7 +84,8 @@ const SessionsPage = () => {
     setSearchParams, 
     resetSearchParams,
     setSessions,
-    downloadSession
+    downloadSession,
+    deleteSession
   } = useSession();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -90,6 +96,10 @@ const SessionsPage = () => {
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Check if user is authenticated, if not redirect to landing page
   useEffect(() => {
@@ -120,35 +130,76 @@ const SessionsPage = () => {
     navigate(`/metrics/${sessionId}`);
   };
 
-  const deleteSelectedSessions = () => {
-    const sessionIdsToDelete = selectedSessions.map((session) => session.id);
-    setSessions(sessions.filter((session) => !sessionIdsToDelete.includes(session.id)));
+  const deleteSelectedSessions = async () => {
+    if (selectedSessions.length === 0) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      const sessionIdsToDelete = selectedSessions.map((session) => session.id);
+      
+      // Sequential deletion to avoid overwhelming the API
+      for (const sessionId of sessionIdsToDelete) {
+        await deleteSession(sessionId);
+      }
+      
+      // Remove deleted sessions from local state
+      setSessions(sessions.filter((session) => !sessionIdsToDelete.includes(session.id)));
+      
+      toast.success(`${sessionIdsToDelete.length} sessions deleted successfully`);
+    } catch (error) {
+      toast.error(`Failed to delete sessions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
   };
 
-  const downloadSelectedSessions = () => {
+  const downloadSelectedSessions = async () => {
     if (selectedSessions.length === 0) {
       toast.error('No sessions selected');
       return;
     }
     
-    // If only one session is selected, download it directly
-    if (selectedSessions.length === 1) {
-      downloadSession(selectedSessions[0].id);
-      return;
-    }
+    setIsDownloading(true);
     
-    // For multiple sessions, we would need to download them one by one
-    toast.info(`Downloading ${selectedSessions.length} sessions...`);
-    selectedSessions.forEach((session, index) => {
-      // Add a small delay to prevent overwhelming the browser with downloads
-      setTimeout(() => {
-        downloadSession(session.id);
-      }, index * 1000);
-    });
+    try {
+      // If only one session is selected, download it directly
+      if (selectedSessions.length === 1) {
+        await downloadSession(selectedSessions[0].id);
+        toast.success('Session downloaded successfully');
+      } else {
+        // For multiple sessions, download them one by one
+        toast.info(`Downloading ${selectedSessions.length} sessions...`);
+        
+        for (let i = 0; i < selectedSessions.length; i++) {
+          const session = selectedSessions[i];
+          await downloadSession(session.id);
+          
+          // Show progress
+          toast.info(`Downloaded ${i + 1}/${selectedSessions.length} sessions`);
+        }
+        
+        toast.success(`All ${selectedSessions.length} sessions downloaded successfully`);
+      }
+    } catch (error) {
+      toast.error(`Failed to download sessions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
-  const handleDownloadSession = (sessionId: string) => {
-    downloadSession(sessionId);
+  const handleDownloadSession = async (sessionId: string) => {
+    setIsDownloading(true);
+    
+    try {
+      await downloadSession(sessionId);
+      toast.success('Session downloaded successfully');
+    } catch (error) {
+      toast.error(`Failed to download session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const toggleSession = (sessionId: string, checked: boolean) => {
@@ -166,7 +217,73 @@ const SessionsPage = () => {
       params.dateEnd = dateRange.to.getTime();
     }
     
+    if (searchQuery) {
+      params.searchQuery = searchQuery;
+    }
+    
     fetchSessions(params);
+  };
+
+  const handleSort = (key: SortKey) => {
+    let newDirection: SortDirection = 'asc';
+    
+    if (sortKey === key) {
+      if (sortDirection === 'asc') {
+        newDirection = 'desc';
+      } else if (sortDirection === 'desc') {
+        newDirection = null;
+      }
+    }
+    
+    setSortKey(newDirection === null ? null : key);
+    setSortDirection(newDirection);
+    
+    // Sort the sessions
+    if (newDirection === null) {
+      // Reset to default order (by time pushed)
+      fetchSessions();
+    } else {
+      const sortedSessions = [...sessions].sort((a, b) => {
+        let valueA, valueB;
+        
+        switch (key) {
+          case 'appName':
+            valueA = a.appName || '';
+            valueB = b.appName || '';
+            break;
+          case 'deviceModel':
+            valueA = a.deviceModel || '';
+            valueB = b.deviceModel || '';
+            break;
+          case 'recordedBy':
+            valueA = a.recordedBy || '';
+            valueB = b.recordedBy || '';
+            break;
+          case 'startTime':
+            valueA = a.startTime || 0;
+            valueB = b.startTime || 0;
+            break;
+          case 'duration':
+            valueA = a.duration || 0;
+            valueB = b.duration || 0;
+            break;
+          default:
+            return 0;
+        }
+        
+        if (typeof valueA === 'string' && typeof valueB === 'string') {
+          return newDirection === 'asc' 
+            ? valueA.localeCompare(valueB)
+            : valueB.localeCompare(valueA);
+        } else {
+          return newDirection === 'asc' 
+            ? (valueA as number) - (valueB as number)
+            : (valueB as number) - (valueA as number);
+        }
+      });
+      
+      setSessions(sortedSessions);
+    }
   };
 
   return (
@@ -292,7 +409,7 @@ const SessionsPage = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <Button size="icon" variant="secondary">
+                <Button size="icon" variant="secondary" onClick={handleApplyFilters}>
                   <Search className="h-4 w-4" />
                 </Button>
               </div>
@@ -330,19 +447,37 @@ const SessionsPage = () => {
                       size="sm"
                       variant="outline"
                       onClick={downloadSelectedSessions}
-                      disabled={isLoading}
+                      disabled={isLoading || isDownloading}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download {selectedSessions.length}
+                      {isDownloading ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <FileDown className="h-4 w-4 mr-2" />
+                          Download {selectedSessions.length}
+                        </>
+                      )}
                     </Button>
                     <Button
                       size="sm"
                       variant="destructive"
                       onClick={() => setShowDeleteDialog(true)}
-                      disabled={isLoading}
+                      disabled={isLoading || isDeleting}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete {selectedSessions.length}
+                      {isDeleting ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete {selectedSessions.length}
+                        </>
+                      )}
                     </Button>
                   </>
                 )}
@@ -364,15 +499,50 @@ const SessionsPage = () => {
                         htmlFor="select-all"
                         className="text-xs font-medium text-muted-foreground"
                       >
-                        SELECT ALL
+                        ALL
                       </label>
                     </div>
                   </TableHead>
-                  <TableHead>App</TableHead>
-                  <TableHead>Device</TableHead>
-                  <TableHead>Recorded By</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Duration</TableHead>
+                  <SortableTableHeader 
+                    sortKey="appName"
+                    currentSortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={() => handleSort('appName')}
+                  >
+                    App
+                  </SortableTableHeader>
+                  <SortableTableHeader 
+                    sortKey="deviceModel"
+                    currentSortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={() => handleSort('deviceModel')}
+                  >
+                    Device
+                  </SortableTableHeader>
+                  <SortableTableHeader 
+                    sortKey="recordedBy"
+                    currentSortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={() => handleSort('recordedBy')}
+                  >
+                    Recorded By
+                  </SortableTableHeader>
+                  <SortableTableHeader 
+                    sortKey="startTime"
+                    currentSortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={() => handleSort('startTime')}
+                  >
+                    Date
+                  </SortableTableHeader>
+                  <SortableTableHeader 
+                    sortKey="duration"
+                    currentSortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={() => handleSort('duration')}
+                  >
+                    Duration
+                  </SortableTableHeader>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -436,12 +606,14 @@ const SessionsPage = () => {
                             variant="secondary"
                             onClick={() => handleViewSessionDetails(session.id)}
                           >
+                            <Eye className="h-4 w-4 mr-1" />
                             Details
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline"
                             onClick={() => handleDownloadSession(session.id)}
+                            disabled={isDownloading}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -469,19 +641,21 @@ const SessionsPage = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                deleteSelectedSessions();
-                setShowDeleteDialog(false);
-              }}
+              onClick={deleteSelectedSessions}
+              disabled={isDeleting}
             >
-              Delete
+              {isDeleting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
-      {/* Add LogWindow at the bottom */}
-      <LogWindow />
     </div>
   );
 };
