@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState } from 'react';
 import { toast } from "sonner";
 import { useAuth } from './AuthContext';
@@ -119,7 +118,7 @@ const defaultSearchParams: SessionSearchParams = {
 };
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { apiToken, username, environment, isAuthenticated } = useAuth();
+  const { apiToken, username, environment, isAuthenticated, companyId } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalSessions, setTotalSessions] = useState(0);
@@ -164,6 +163,11 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (mergedParams.sort) {
         queryParams.append('sort', mergedParams.sort);
       }
+
+      // Add company ID to query params if available
+      if (companyId) {
+        queryParams.append('company', companyId);
+      }
       
       const apiUrl = getApiUrl(environment);
       const url = `${apiUrl}/v1/sessions?${queryParams.toString()}`;
@@ -174,12 +178,13 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         method: 'POST',
         headers: {
           'Authorization': createBasicAuth(username, apiToken),
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
-          "apps": mergedParams.apps || [],
-          "devices": mergedParams.devices || [],
-          "manufacturers": mergedParams.manufacturers || []
+          apps: mergedParams.apps || [],
+          devices: mergedParams.devices || [],
+          manufacturers: mergedParams.manufacturers || []
         })
       });
       
@@ -188,13 +193,31 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       const data = await response.json();
+      console.log('Response data:', data); // Debug log
+      
+      // Check if data exists and has the expected structure
+      if (!data || !Array.isArray(data.sessions)) {
+        throw new Error('Invalid response format: sessions array not found');
+      }
       
       // Map API response to our Session interface
       const mappedSessions = data.sessions.map((session: any) => ({
-        id: session.id,
-        app: session.app || { name: 'Unknown', version: 'Unknown', package: 'Unknown' },
-        device: session.device || { model: 'Unknown', manufacturer: 'Unknown' },
-        metrics: session.metrics,
+        id: session.id || 'unknown',
+        app: {
+          name: session.app?.name || 'Unknown',
+          version: session.app?.version || 'Unknown',
+          package: session.app?.package || 'Unknown'
+        },
+        device: {
+          model: session.device?.model || 'Unknown',
+          manufacturer: session.device?.manufacturer || 'Unknown'
+        },
+        metrics: {
+          fps: session.metrics?.fps || undefined,
+          cpu: session.metrics?.cpu || undefined,
+          memory: session.metrics?.memory || undefined,
+          battery: session.metrics?.battery || undefined
+        },
         startTime: session.startTime || Date.now(),
         duration: session.duration || 0,
         userEmail: session.userEmail || 'Unknown',
@@ -208,7 +231,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }));
       
       setSessions(mappedSessions);
-      setTotalSessions(data.total || 0);
+      setTotalSessions(data.total || mappedSessions.length);
       setCurrentPage(mergedParams.page || 0);
       
       toast.success(`Loaded ${mappedSessions.length} sessions successfully`);
