@@ -49,8 +49,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCompanyId(companyId || '');
         setUsername(username || '');
         setEnvironment(environment || ENVIRONMENT_OPTIONS[0].value);
+        
+        // If we have valid credentials, set isAuthenticated to true
+        if (apiToken && username) {
+          setIsAuthenticated(true);
+        }
       } catch (error) {
-        console.error('Failed to parse saved credentials:', error);
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
     }
@@ -104,7 +108,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const apiUrl = getApiUrl(environment);
       // Test authentication using the sessions endpoint with pageSize=1
       const testUrl = `${apiUrl}/v1/sessions?pageSize=1&sort=timePushed:desc`;
-      console.log('Attempting to validate credentials with URL:', testUrl);
       
       const response = await Promise.race([
         fetch(testUrl, {
@@ -147,13 +150,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         toast.error(userMessage, {
-          description: `Technical details:\n${errorDetails}`,
+          description: `Technical details: ${errorDetails}`,
           duration: 10000
         });
         return false;
       }
     } catch (error) {
-      console.error('Error validating credentials:', error);
       setIsAuthenticated(false);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to validate API credentials', {
