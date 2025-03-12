@@ -1,6 +1,4 @@
-
-import { ValidationRule, MetricCondition, MetricOperator } from '@/types/validation';
-import { Session } from '@/context/SessionContext';
+import { ValidationRule, MetricCondition, MetricOperator, Session } from '@/types/validation';
 
 // Helper function to safely get a nested property from an object
 const getNestedProperty = (obj: any, path: string): any => {

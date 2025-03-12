@@ -47,6 +47,7 @@ import {
   ValidationResult,
   MetricOperator,
   MetricCondition,
+  Session
 } from '@/types/validation';
 import { validateRule, getDefaultRules, getMetricFields, getConditionsForOperator, getOperatorForField } from '@/utils/validationUtils';
 import { Check, Copy, Plus, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
@@ -172,7 +173,7 @@ const ValidationPage = () => {
           operator: rule.operator,
           expectedCondition: rule.condition,
           expectedValue: rule.value,
-          actualValue: session[rule.field as keyof typeof session],
+          actualValue: session[rule.field as keyof Session],
           description: rule.description,
         };
       });
@@ -365,7 +366,9 @@ const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, o
   const [field, setField] = useState(rule?.field || 'fps.min');
   const [operator, setOperator] = useState<MetricOperator>(rule?.operator || 'number');
   const [condition, setCondition] = useState<MetricCondition>(rule?.condition || '>=');
-  const [value, setValue] = useState(rule?.value !== undefined ? rule.value : 0);
+  const [value, setValue] = useState<string | number | boolean | [number, number] | [string, string]>(
+    rule?.value !== undefined ? rule.value : 0
+  );
   const [enabled, setEnabled] = useState(rule?.enabled !== undefined ? rule.enabled : true);
   const [description, setDescription] = useState(rule?.description || '');
 
@@ -512,7 +515,7 @@ const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, o
               value={Array.isArray(value) ? value[0] : 0}
               onChange={(e) => {
                 const newValue = Number(e.target.value);
-                setValue(Array.isArray(value) ? [newValue, value[1]] : [newValue, 0]);
+                setValue(Array.isArray(value) ? [newValue, Number(value[1])] : [newValue, 0]);
               }}
             />
             <Input
@@ -521,7 +524,7 @@ const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, o
               value={Array.isArray(value) ? value[1] : 0}
               onChange={(e) => {
                 const newValue = Number(e.target.value);
-                setValue(Array.isArray(value) ? [value[0], newValue] : [0, newValue]);
+                setValue(Array.isArray(value) ? [Number(value[0]), newValue] : [0, newValue]);
               }}
             />
           </div>
