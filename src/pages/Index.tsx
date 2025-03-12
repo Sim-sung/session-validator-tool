@@ -13,17 +13,34 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
-import { Shield, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Shield, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { apiToken, companyId, username, isAuthenticated, isValidating, saveCredentials, validateCredentials } = useAuth();
+  const { 
+    apiToken, 
+    companyId, 
+    username, 
+    isAuthenticated, 
+    isValidating, 
+    saveCredentials, 
+    validateCredentials 
+  } = useAuth();
   
   const [localApiToken, setLocalApiToken] = useState(apiToken);
   const [localCompanyId, setLocalCompanyId] = useState(companyId);
   const [localUsername, setLocalUsername] = useState(username);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>(
+    isAuthenticated ? 'success' : 'idle'
+  );
 
   const handleConnect = async () => {
+    if (!localApiToken) {
+      toast.error('API Token is required');
+      return;
+    }
+    
     saveCredentials({
       apiToken: localApiToken,
       companyId: localCompanyId,
@@ -31,8 +48,15 @@ const Index = () => {
     });
     
     const validated = await validateCredentials();
+    
     if (validated) {
-      navigate('/sessions');
+      setConnectionStatus('success');
+      // Short delay before navigating to show the success state
+      setTimeout(() => {
+        navigate('/sessions');
+      }, 1000);
+    } else {
+      setConnectionStatus('error');
     }
   };
 
@@ -103,10 +127,17 @@ const Index = () => {
             {isValidating ? 'Validating...' : isAuthenticated ? 'Reconnect' : 'Connect'}
           </Button>
           
-          {isAuthenticated && (
+          {connectionStatus === 'success' && (
             <div className="flex items-center justify-center text-sm text-green-600 gap-1">
               <CheckCircle2 className="h-4 w-4" />
               <span>Connected successfully</span>
+            </div>
+          )}
+          
+          {connectionStatus === 'error' && (
+            <div className="flex items-center justify-center text-sm text-red-600 gap-1">
+              <XCircle className="h-4 w-4" />
+              <span>Authentication failed</span>
             </div>
           )}
           

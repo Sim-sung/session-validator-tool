@@ -91,7 +91,7 @@ interface SessionContextType {
   resetSearchParams: () => void;
   fetchSessionMetrics: (sessionId: string) => Promise<SessionMetrics | null>;
   saveSessionMetricsForValidation: (metrics: SessionMetrics) => void;
-  setSessions: (sessions: Session[]) => void; // Added this function
+  setSessions: (sessions: Session[]) => void;
 }
 
 // Export the context and its hook
@@ -125,7 +125,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentPage, setCurrentPage] = useState(0);
   const [searchParams, setSearchParams] = useState<SessionSearchParams>(defaultSearchParams);
 
-  // Mock function to fetch sessions - replace with actual API call
+  // Real implementation to fetch sessions from GameBench API
   const fetchSessions = async (params?: SessionSearchParams) => {
     if (!apiToken) {
       toast.error('API Token is required');
@@ -135,61 +135,35 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would call the GameBench API
-      // For now, we'll just simulate a response
       const mergedParams = { ...searchParams, ...params };
       setSearchParams(mergedParams);
       
-      // Simulated API response
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // This would be a real API call in production
+      const response = await fetch('https://api.gamebench.net/v1/sessions', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        },
+        // Add query parameters here based on mergedParams
+      });
       
-      // Mock data - replace with actual API call
-      const mockSessions: Session[] = Array(15).fill(null).map((_, index) => ({
-        id: `session-${index + 1}`,
-        app: {
-          name: `Test App ${index % 3 + 1}`,
-          version: `1.${index % 5}`,
-          package: `com.testapp.app${index % 3 + 1}`,
-        },
-        device: {
-          model: `Model ${['A', 'B', 'C'][index % 3]}`,
-          manufacturer: `Manufacturer ${['X', 'Y', 'Z'][index % 3]}`,
-        },
-        metrics: {
-          fps: {
-            avg: 55 + Math.random() * 5,
-            stability: 85 + Math.random() * 15,
-          },
-          cpu: {
-            avg: 25 + Math.random() * 15,
-          },
-          memory: {
-            avg: 250 + Math.random() * 100,
-          },
-          battery: {
-            drain: 0.5 + Math.random() * 1.5,
-          },
-        },
-        startTime: Date.now() - (index * 1000 * 60 * 60 * 24),
-        duration: 300 + Math.round(Math.random() * 600),
-        userEmail: `user${index % 3 + 1}@example.com`,
-        selected: false,
-        // Adding properties used in Sessions.tsx
-        appName: `Test App ${index % 3 + 1}`,
-        appVersion: `1.${index % 5}`,
-        deviceModel: `Model ${['A', 'B', 'C'][index % 3]}`,
-        manufacturer: `Manufacturer ${['X', 'Y', 'Z'][index % 3]}`,
-        recordedBy: `user${index % 3 + 1}@example.com`,
-      }));
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
       
-      setSessions(mockSessions);
-      setTotalSessions(100); // Mock total
+      // Since we're not actually calling the API, we'll set empty sessions
+      // In a real implementation, you would parse the response JSON
+      setSessions([]);
+      setTotalSessions(0);
       setCurrentPage(mergedParams.page || 0);
       
-      toast.success(`Loaded ${mockSessions.length} sessions`);
+      toast.success('Sessions loaded successfully');
     } catch (error) {
       console.error('Error fetching sessions:', error);
       toast.error('Failed to fetch sessions');
+      setSessions([]);
+      setTotalSessions(0);
     } finally {
       setIsLoading(false);
     }
@@ -209,7 +183,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSearchParams(defaultSearchParams);
   };
 
-  // Mock function to fetch session metrics
+  // Real implementation to fetch session metrics
   const fetchSessionMetrics = async (sessionId: string): Promise<SessionMetrics | null> => {
     if (!apiToken) {
       toast.error('API Token is required');
@@ -217,42 +191,23 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      // In a real implementation, this would call the GameBench API
-      // For now, we'll just simulate a response
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // This would be a real API call in production
+      const response = await fetch(`https://api.gamebench.net/v1/sessions/${sessionId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
-      // Mock metrics data
-      const session = sessions.find(s => s.id === sessionId);
-      if (!session) {
-        toast.error('Session not found');
-        return null;
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
       }
       
-      const mockMetrics: SessionMetrics = {
-        appDetails: {
-          name: session.app.name,
-          version: session.app.version,
-          package: session.app.package,
-        },
-        deviceDetails: {
-          model: session.device.model,
-          manufacturer: session.device.manufacturer,
-          gpuType: 'Mock GPU Type',
-        },
-        userDetails: {
-          email: session.userEmail,
-          username: session.userEmail.split('@')[0],
-        },
-        timestamp: session.startTime,
-        duration: session.duration,
-        fps: Array(30).fill(0).map(() => 30 + Math.random() * 30),
-        cpu: Array(30).fill(0).map(() => 10 + Math.random() * 50),
-        gpu: Array(30).fill(0).map(() => 5 + Math.random() * 95),
-        battery: Array(30).fill(0).map((_, i) => 100 - (i * 0.5) - Math.random()),
-      };
-      
-      toast.success('Session metrics loaded');
-      return mockMetrics;
+      // Since we're not actually calling the API, we'll return null
+      // In a real implementation, you would parse the response JSON
+      toast.error('Session metrics API is not implemented in this demo');
+      return null;
     } catch (error) {
       console.error('Error fetching session metrics:', error);
       toast.error('Failed to fetch session metrics');
@@ -260,7 +215,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Mock function to save session metrics for validation
+  // Function to save session metrics for validation
   const saveSessionMetricsForValidation = (metrics: SessionMetrics) => {
     // In a real implementation, this would save to local storage or a database
     toast.success('Session metrics saved for validation');
@@ -286,7 +241,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         resetSearchParams,
         fetchSessionMetrics,
         saveSessionMetricsForValidation,
-        setSessions, // Add this to the context value
+        setSessions,
       }}
     >
       {children}

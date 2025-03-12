@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
 
@@ -71,26 +72,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsValidating(true);
     
     try {
-      // Just a mock API validation for now
-      // In a real application, this would call the actual GameBench API
-      const response = await new Promise<{ success: boolean }>((resolve) => {
-        setTimeout(() => {
-          resolve({ success: true });
-        }, 1500);
+      // Make a real API call to validate credentials
+      const response = await fetch('https://api.gamebench.net/v1/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        }
       });
 
-      if (response.success) {
+      if (response.ok) {
         setIsAuthenticated(true);
         toast.success('API credentials validated successfully');
         return true;
       } else {
         setIsAuthenticated(false);
-        toast.error('Invalid API credentials');
+        
+        // Provide more specific error messages based on response status
+        if (response.status === 401) {
+          toast.error('Invalid API credentials - Authentication failed');
+        } else if (response.status === 403) {
+          toast.error('Permission denied - Check your access rights');
+        } else {
+          toast.error(`API validation failed (${response.status})`);
+        }
+        
         return false;
       }
     } catch (error) {
       console.error('Error validating credentials:', error);
-      toast.error('Failed to validate API credentials');
+      setIsAuthenticated(false);
+      toast.error('Failed to validate API credentials - Network or server error');
       return false;
     } finally {
       setIsValidating(false);
