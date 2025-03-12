@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -42,6 +41,7 @@ import {
   Info, 
   Clock 
 } from 'lucide-react';
+import { LogWindow } from '@/components/LogWindow';
 
 const formatDuration = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);
@@ -461,6 +461,9 @@ const SessionsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Add LogWindow at the bottom */}
+      <LogWindow />
     </div>
   );
 };
