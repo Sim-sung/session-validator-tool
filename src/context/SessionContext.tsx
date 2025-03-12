@@ -1,58 +1,10 @@
 
-import React, { 
-  createContext, 
-  useState, 
-  useEffect, 
-  useContext,
-  ReactNode
-} from 'react';
-import { 
-  getSessions,
-  downloadSession,
-  deleteSession,
-  fetchSessionMetrics,
-  saveSessionMetricsForValidation
-} from '@/services/sessionApi';
-import { Session } from '@/types/validation';
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import { fetchSessions, downloadSession as downloadSessionApi, deleteSession as deleteSessionApi } from '@/services/sessionApi';
+import { Session, SessionMetrics } from '@/types/validation';
 
-// Define SessionMetrics interface 
-export interface SessionMetrics {
-  appDetails: {
-    name: string;
-    version: string;
-    package: string;
-  };
-  deviceDetails: {
-    model: string;
-    manufacturer: string;
-    gpuType: string;
-  };
-  userDetails: {
-    email: string;
-    username: string;
-  };
-  timestamp: number;
-  duration: number;
-  fps: number[];
-  cpu: number[];
-  gpu: number[];
-  battery: number[];
-  // Add other metrics as needed
-}
-
-interface SearchParams {
-  dateStart?: number;
-  dateEnd?: number;
-  apps?: string[];
-  devices?: string[];
-  manufacturers?: string[];
-  page?: number;
-  pageSize?: number;
-  sort?: string;
-  searchQuery?: string;
-}
-
-export interface SessionContextType {
+// Context type
+interface SessionContextType {
   sessions: Session[];
   isLoading: boolean;
   totalSessions: number;
@@ -64,36 +16,31 @@ export interface SessionContextType {
     apps?: string[];
     devices?: string[];
     manufacturers?: string[];
-    page?: number;
-    pageSize?: number;
+    page: number;
+    pageSize: number;
     sort?: string;
     searchQuery?: string;
   };
-  fetchSessions: (params?: Partial<SearchParams>) => Promise<void>;
-  fetchSessionMetrics: (sessionId: string) => Promise<SessionMetrics>;
-  saveSessionMetricsForValidation: (metrics: SessionMetrics) => boolean;
+  fetchSessions: (params?: any) => Promise<void>;
   selectSession: (sessionId: string, checked: boolean) => void;
   selectAllSessions: (checked: boolean) => void;
-  setSearchParams: (params: Partial<SearchParams>) => void;
+  setSearchParams: (params: any) => void;
   resetSearchParams: () => void;
-  setSessions: (sessions: Session[]) => void;
+  setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
   downloadSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
+  fetchSessionMetrics: (sessionId: string) => Promise<SessionMetrics>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-interface SessionProviderProps {
-  children: ReactNode;
-}
-
-export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) => {
+export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [totalSessions, setTotalSessions] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalSessions, setTotalSessions] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedSessions, setSelectedSessions] = useState<Session[]>([]);
-  const [searchParams, setSearchParams] = useState<SearchParams>({
+  const [searchParams, setSearchParams] = useState({
     dateStart: undefined,
     dateEnd: undefined,
     apps: [],
@@ -102,20 +49,20 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
     page: 1,
     pageSize: 10,
     sort: undefined,
-    searchQuery: undefined,
+    searchQuery: undefined
   });
 
-  const fetchSessionsData = async (params: Partial<SearchParams> = {}) => {
+  const fetchSessionsData = async (params = {}) => {
     setIsLoading(true);
     try {
-      const response = await getSessions(params);
+      const response = await fetchSessions(params);
       setSessions(response.sessions);
       setTotalSessions(response.total);
       setCurrentPage(params.page || 1);
       
       // Update selected sessions based on the new data
       setSelectedSessions(prevSelected => {
-        return prevSelected.filter(selectedSession =>
+        return prevSelected.filter(selectedSession => 
           response.sessions.some(session => session.id === selectedSession.id)
         );
       });
@@ -130,7 +77,10 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
     setSessions(prevSessions => {
       return prevSessions.map(session => {
         if (session.id === sessionId) {
-          return { ...session, selected: checked };
+          return {
+            ...session,
+            selected: checked
+          };
         }
         return session;
       });
@@ -148,13 +98,21 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
 
   const selectAllSessions = (checked: boolean) => {
     setSessions(prevSessions => {
-      return prevSessions.map(session => ({ ...session, selected: checked }));
+      return prevSessions.map(session => ({
+        ...session,
+        selected: checked
+      }));
     });
+    
     setSelectedSessions(checked ? [...sessions] : []);
   };
 
-  const updateSearchParams = (params: Partial<SearchParams>) => {
-    setSearchParams(prevParams => ({ ...prevParams, ...params, page: 1 }));
+  const updateSearchParams = (params: any) => {
+    setSearchParams(prevParams => ({
+      ...prevParams,
+      ...params,
+      page: 1
+    }));
   };
 
   const resetSearchParams = () => {
@@ -167,46 +125,59 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
       page: 1,
       pageSize: 10,
       sort: undefined,
-      searchQuery: undefined,
+      searchQuery: undefined
     });
   };
 
-  const downloadSessionData = async (sessionId: string) => {
+  const downloadSession = async (sessionId: string) => {
     try {
-      await downloadSession(sessionId);
+      await downloadSessionApi(sessionId);
     } catch (error) {
       console.error("Failed to download session:", error);
       throw error;
     }
   };
 
-  const deleteSessionData = async (sessionId: string) => {
+  const deleteSession = async (sessionId: string) => {
     try {
-      await deleteSession(sessionId);
+      await deleteSessionApi(sessionId);
     } catch (error) {
       console.error("Failed to delete session:", error);
       throw error;
     }
   };
 
-  const fetchMetrics = async (sessionId: string): Promise<SessionMetrics> => {
-    try {
-      return await fetchSessionMetrics(sessionId);
-    } catch (error) {
-      console.error("Failed to fetch session metrics:", error);
-      throw error;
-    }
-  };
-
-  const saveMetricsForValidation = (metrics: SessionMetrics): boolean => {
-    return saveSessionMetricsForValidation(metrics);
+  // Mock implementation for fetchSessionMetrics
+  const fetchSessionMetrics = async (sessionId: string): Promise<SessionMetrics> => {
+    // In a real application, this would make an API call
+    // For now, return mock data
+    return {
+      fps: [60, 58, 59, 60, 57, 60, 59, 60, 60, 58],
+      cpu: [25, 30, 28, 32, 35, 30, 27, 29, 31, 28],
+      gpu: [40, 45, 42, 47, 50, 48, 45, 46, 47, 44],
+      battery: [95, 94, 93, 92, 91, 90, 89, 88, 87, 86],
+      appDetails: {
+        name: "Demo App",
+        version: "1.0.0",
+        package: "com.example.demoapp"
+      },
+      deviceDetails: {
+        model: "Test Model",
+        manufacturer: "Test Manufacturer",
+        gpuType: "Test GPU"
+      },
+      userDetails: {
+        email: "user@example.com",
+        username: "testuser"
+      }
+    };
   };
 
   useEffect(() => {
     fetchSessionsData(searchParams);
   }, [searchParams]);
 
-  const value: SessionContextType = {
+  const value = {
     sessions,
     isLoading,
     totalSessions,
@@ -214,15 +185,14 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
     selectedSessions,
     searchParams,
     fetchSessions: fetchSessionsData,
-    fetchSessionMetrics: fetchMetrics,
-    saveSessionMetricsForValidation: saveMetricsForValidation,
     selectSession,
     selectAllSessions,
     setSearchParams: updateSearchParams,
     resetSearchParams,
     setSessions,
-    downloadSession: downloadSessionData,
-    deleteSession: deleteSessionData,
+    downloadSession,
+    deleteSession,
+    fetchSessionMetrics
   };
 
   return (

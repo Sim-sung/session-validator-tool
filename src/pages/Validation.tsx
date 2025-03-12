@@ -460,7 +460,7 @@ const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, o
           <SelectContent>
             {Object.entries(metricFields).map(([category, fields]) => (
               <React.Fragment key={category}>
-                <SelectItem disabled className="font-bold text-gray-500">
+                <SelectItem value="" disabled className="font-bold text-gray-500">
                   {category}
                 </SelectItem>
                 {fields.map(f => (
@@ -515,7 +515,10 @@ const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, o
               value={Array.isArray(value) ? value[0] : 0}
               onChange={(e) => {
                 const newValue = Number(e.target.value);
-                setValue(Array.isArray(value) ? [newValue, Number(value[1])] : [newValue, 0]);
+                // Ensure we're working with number arrays for 'between' condition
+                setValue(Array.isArray(value) 
+                  ? [newValue, typeof value[1] === 'number' ? value[1] : Number(value[1])] 
+                  : [newValue, 0]);
               }}
             />
             <Input
@@ -524,7 +527,10 @@ const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, o
               value={Array.isArray(value) ? value[1] : 0}
               onChange={(e) => {
                 const newValue = Number(e.target.value);
-                setValue(Array.isArray(value) ? [Number(value[0]), newValue] : [0, newValue]);
+                // Ensure we're working with number arrays for 'between' condition
+                setValue(Array.isArray(value) 
+                  ? [typeof value[0] === 'number' ? value[0] : Number(value[0]), newValue] 
+                  : [0, newValue]);
               }}
             />
           </div>
@@ -532,7 +538,7 @@ const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, o
           <Input
             type={operator === 'number' ? 'number' : 'text'}
             id="value"
-            value={value !== null ? value : ''}
+            value={typeof value === 'boolean' ? (value ? 'true' : 'false') : value as any}
             onChange={(e) => setValue(operator === 'number' ? Number(e.target.value) : e.target.value)}
           />
         )}

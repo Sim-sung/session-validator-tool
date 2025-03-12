@@ -57,6 +57,7 @@ export type MetricField =
   // Allow any string as a field (for dynamic field access)
   | string;
 
+// Complete Session interface with all properties used throughout the application
 export interface Session {
   id: string;
   uuid: string;
@@ -98,6 +99,7 @@ export interface Session {
     injected: string;
   };
   isActive?: boolean;
+  isCharging?: boolean;
   selected: boolean;
   startTime: number;
   duration: number;
@@ -106,6 +108,61 @@ export interface Session {
   appName: string;
   deviceModel: string;
   recordedBy: string;
+  
+  // Additional properties referenced in validationUtils
+  fpsMin?: number;
+  fpsMax?: number;
+  fpsMedian?: number;
+  fpsStability?: number;
+  fpsOnePercentLow?: number;
+  
+  cpuUsageMin?: number;
+  cpuUsageMax?: number;
+  cpuUsageMedian?: number;
+  cpuUsageAvg?: number;
+  totalCpuUsageAvg?: number;
+  
+  gpuUsageMin?: number;
+  gpuUsageMax?: number;
+  gpuUsageMedian?: number;
+  gpuUsageAvg?: number;
+  
+  memUsageMin?: number;
+  memUsageMax?: number;
+  memUsageMedian?: number;
+  memUsageAvg?: number;
+  
+  androidMemUsageMin?: number;
+  androidMemUsageMax?: number;
+  androidMemUsageMedian?: number;
+  androidMemUsageAvg?: number;
+  
+  firstBat?: number;
+  lastBat?: number;
+  
+  powerUsage?: number;
+  mWAvg?: number;
+  mAh?: number;
+  mAAvg?: number;
+  
+  bigJanksCount?: number;
+  bigJanks10Mins?: number;
+  smallJanksCount?: number;
+  smallJanks10Mins?: number;
+  janksCount?: number;
+  janks10Mins?: number;
+  
+  appSize?: number;
+  appCache?: number;
+  appData?: number;
+  appLaunchTimeMs?: number;
+  
+  totalDeviceMemory?: number;
+  
+  timePlayed?: number;
+  sessionDate?: number;
+  timePushed?: number;
+  
   networkAppUsage?: {
     appTotalDataReceived: number;
     appTotalDataSent: number;
@@ -139,4 +196,26 @@ export interface ValidationResult {
     description?: string;
   }[];
   overallResult: 'pass' | 'fail';
+}
+
+// SessionMetrics interface for use in the Metrics component
+export interface SessionMetrics {
+  fps: number[];
+  cpu: number[];
+  gpu: number[];
+  battery: number[];
+  appDetails: {
+    name: string;
+    version: string;
+    package: string;
+  };
+  deviceDetails: {
+    model: string;
+    manufacturer: string;
+    gpuType: string;
+  };
+  userDetails: {
+    email: string;
+    username: string;
+  };
 }

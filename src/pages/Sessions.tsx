@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '@/context/SessionContext';
@@ -201,8 +202,10 @@ const SessionsPage = () => {
                     checked={isAllSelected}
                     aria-label="Select all"
                     onCheckedChange={(checked) => {
-                      selectAllSessions(checked!);
-                      setIsAllSelected(checked!);
+                      // Ensure checked is treated as boolean
+                      const isChecked = checked === true;
+                      selectAllSessions(isChecked);
+                      setIsAllSelected(isChecked);
                     }}
                   />
                 </TableHead>
@@ -221,7 +224,10 @@ const SessionsPage = () => {
                     <Checkbox
                       checked={session.selected}
                       aria-label={`Select session ${session.id}`}
-                      onCheckedChange={(checked) => selectSession(session.id, checked!)}
+                      onCheckedChange={(checked) => {
+                        // Ensure checked is treated as boolean
+                        selectSession(session.id, checked === true);
+                      }}
                     />
                   </TableCell>
                   <TableCell>{session.appName}</TableCell>
@@ -285,7 +291,7 @@ const SessionsPage = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeleteOpen(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDelete}>Delete</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={handleDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useSession, SessionMetrics } from '@/context/SessionContext';
+import { useSession } from '@/context/SessionContext';
+import { SessionMetrics } from '@/types/validation';
 import {
   Card,
   CardHeader,
@@ -30,7 +31,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-interface Params {
+// Using Record<string, string> to satisfy the constraint
+interface Params extends Record<string, string> {
   sessionId: string;
 }
 
