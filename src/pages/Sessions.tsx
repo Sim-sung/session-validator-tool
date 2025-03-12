@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -59,21 +58,25 @@ const SessionsPage = () => {
   const { isAuthenticated } = useAuth();
   const { 
     sessions, 
-    selectedSessions, 
     isLoading, 
-    dateRange, 
-    searchQuery, 
-    setDateRange, 
-    setSearchQuery, 
+    totalSessions, 
+    currentPage, 
+    selectedSessions, 
+    searchParams, 
     fetchSessions, 
-    toggleSession, 
-    toggleAllSessions, 
-    deleteSelectedSessions, 
-    downloadSelectedSessions 
+    selectSession, 
+    selectAllSessions, 
+    setSearchParams, 
+    resetSearchParams,
   } = useSession();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isAllSelected, setIsAllSelected] = useState(false);
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
+    from: undefined,
+    to: undefined,
+  });
+  const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Check if user is authenticated, if not redirect to landing page
   useEffect(() => {
@@ -87,7 +90,7 @@ const SessionsPage = () => {
     if (isAuthenticated) {
       fetchSessions();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchSessions]);
 
   // Update isAllSelected when sessions or selectedSessions change
   useEffect(() => {
@@ -95,12 +98,26 @@ const SessionsPage = () => {
   }, [sessions, selectedSessions]);
 
   const handleToggleAll = () => {
-    toggleAllSessions(!isAllSelected);
+    selectAllSessions(!isAllSelected);
     setIsAllSelected(!isAllSelected);
   };
 
   const handleViewSessionDetails = (sessionId: string) => {
-    navigate(`/metrics?sessionId=${sessionId}`);
+    navigate(`/metrics/${sessionId}`);
+  };
+
+  const deleteSelectedSessions = () => {
+    const sessionIdsToDelete = selectedSessions.map((session) => session.id);
+    setSessions(sessions.filter((session) => !sessionIdsToDelete.includes(session.id)));
+  };
+
+  const downloadSelectedSessions = () => {
+    // Implement your download logic here
+    console.log('Downloading selected sessions...');
+  };
+
+  const toggleSession = (sessionId: string, checked: boolean) => {
+    selectSession(sessionId, checked);
   };
 
   return (
