@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
@@ -15,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSession, SessionMetrics } from '@/context/SessionContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
+import { toast } from "sonner";
 import { 
   ArrowLeft, 
   Download, 
