@@ -1,3 +1,4 @@
+
 export type MetricCondition = 
   // Numeric conditions
   | '>' | '>=' | '<' | '<=' | '==' | '!=' | 'between'
@@ -7,7 +8,9 @@ export type MetricCondition =
   // Boolean conditions
   | 'isTrue' | 'isFalse'
   // Date conditions
-  | 'before' | 'after' | 'on';
+  | 'before' | 'after' | 'on'
+  // Null conditions
+  | 'not_null';
 
 export type MetricOperator = 'number' | 'string' | 'boolean' | 'date';
 
@@ -140,6 +143,9 @@ export interface Session {
   duration: number;
   manufacturer: string;
   appVersion: string;
+  appName: string;
+  deviceModel: string;
+  recordedBy: string;
   networkAppUsage?: {
     appTotalDataReceived: number;
     appTotalDataSent: number;

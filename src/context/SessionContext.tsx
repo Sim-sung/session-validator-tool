@@ -1,3 +1,4 @@
+
 import React, { 
   createContext, 
   useState, 
@@ -9,7 +10,7 @@ import {
   getSessions as fetchAllSessions,
   downloadSession as downloadSessionApi,
   deleteSession as deleteSessionApi
-} from '@/lib/api';
+} from '@/services/api';
 import { Session } from '@/types/validation';
 
 interface SearchParams {
@@ -194,3 +195,4 @@ export const useSession = () => {
   }
   return context;
 };
+
