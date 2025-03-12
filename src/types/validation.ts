@@ -15,17 +15,24 @@ export type MetricField =
   | 'janks.small.count' | 'janks.small.per10min'
   | 'janks.total.count' | 'janks.total.per10min'
   // App Metrics
-  | 'app.size' | 'app.cache' | 'app.data'
+  | 'app.size' | 'app.cache' | 'app.data' | 'app.packageName' | 'app.versionCode'
   | 'app.launchTime'
   // Device Metrics
   | 'device.memory.total'
   | 'device.battery.capacity' | 'device.battery.voltage'
   | 'device.screen.width' | 'device.screen.height' | 'device.screen.refreshRate'
+  | 'device.androidVersion' | 'device.androidSdk'
+  | 'device.cpu.cores' | 'device.cpu.maxFreq' | 'device.cpu.minFreq'
+  | 'device.gpu.vendor' | 'device.gpu.renderer'
   // Network Metrics
   | 'network.received' | 'network.sent'
   // Session Info
   | 'session.duration'
-  | 'session.timestamp';
+  | 'session.timestamp'
+  | 'session.isActive'
+  | 'session.isCharging'
+  | 'session.timePushed'
+  | 'session.sessionDate';
 
 export interface ValidationRule {
   id: string;

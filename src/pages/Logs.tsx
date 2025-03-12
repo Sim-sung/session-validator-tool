@@ -47,7 +47,7 @@ interface FieldCategory {
   fields: {
     key: string;
     label: string;
-    format?: (value: any) => string | JSX.Element;
+    format?: (value: any) => string | React.ReactNode;
   }[];
 }
 
@@ -66,7 +66,7 @@ const formatTimestamp = (timestamp: number | null | undefined): string => {
 };
 
 // Function to format boolean values
-const formatBoolean = (value: boolean | null | undefined): JSX.Element => {
+const formatBoolean = (value: boolean | null | undefined): React.ReactNode => {
   if (value === null || value === undefined) return <span>N/A</span>;
   return value ? 
     <Badge variant="success" className="bg-green-600">Yes</Badge> : 
@@ -537,10 +537,10 @@ const LogsPage: React.FC = () => {
                             <div className="text-xs text-muted-foreground">{session.device?.manufacturer}</div>
                           </TableCell>
                           <TableCell>
-                            {new Date(session.sessionDate).toLocaleDateString()}
+                            {session.sessionDate ? new Date(session.sessionDate).toLocaleDateString() : 'N/A'}
                           </TableCell>
                           <TableCell>
-                            {Math.round(session.timePlayed / 60)} min
+                            {session.timePlayed ? Math.round(session.timePlayed / 60) : 'N/A'} min
                           </TableCell>
                         </TableRow>
                         
