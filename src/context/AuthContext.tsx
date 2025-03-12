@@ -1,6 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
-import { getApiUrl, createBasicAuth } from '@/utils/environments';
+import { getApiUrl, createBasicAuth, ENVIRONMENT_OPTIONS } from '@/utils/environments';
 
 interface AuthState {
   apiToken: string;
@@ -35,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [apiToken, setApiToken] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [username, setUsername] = useState('');
-  const [environment, setEnvironment] = useState('https://web.gamebench.net');
+  const [environment, setEnvironment] = useState(ENVIRONMENT_OPTIONS[0].value);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
 
@@ -47,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setApiToken(apiToken || '');
         setCompanyId(companyId || '');
         setUsername(username || '');
-        setEnvironment(environment || 'https://api.gamebench.net');
+        setEnvironment(environment || ENVIRONMENT_OPTIONS[0].value);
       } catch (error) {
         console.error('Failed to parse saved credentials:', error);
         localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -102,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const apiUrl = getApiUrl(environment);
       // Test authentication using the sessions endpoint with pageSize=1
-      const testUrl = `${apiUrl}/sessions?pageSize=1`;
+      const testUrl = `${apiUrl}/v1/sessions?pageSize=1&sort=timePushed:desc`;
       console.log('Attempting to validate credentials with URL:', testUrl);
       
       const response = await Promise.race([
@@ -169,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setApiToken('');
     setCompanyId('');
     setUsername('');
-    setEnvironment('https://api.gamebench.net');
+    setEnvironment(ENVIRONMENT_OPTIONS[0].value);
     setIsAuthenticated(false);
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     toast.info('Logged out successfully');

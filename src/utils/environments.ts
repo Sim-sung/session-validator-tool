@@ -1,22 +1,25 @@
 
-export interface Environment {
-  label: string;
-  baseUrl: string;
-}
+// Helper functions for environment management
 
-export const environments: Environment[] = [
-  { label: 'Production', baseUrl: 'https://web.gamebench.net' },
-  { label: 'QA (v2-30-0)', baseUrl: 'https://gb-v2-30-0.qa.gbdev.tech' },
+// Extract the API URL from the environment URL
+export const getApiUrl = (environmentUrl: string): string => {
+  // Remove trailing slash if it exists
+  const normalizedUrl = environmentUrl.endsWith('/') 
+    ? environmentUrl.slice(0, -1) 
+    : environmentUrl;
+  
+  return normalizedUrl;
+};
+
+// Create Basic Auth header value for API authentication
+export const createBasicAuth = (username: string, apiToken: string): string => {
+  const credentials = `${username}:${apiToken}`;
+  const encodedCredentials = btoa(credentials);
+  return `Basic ${encodedCredentials}`;
+};
+
+// Environment options for the application
+export const ENVIRONMENT_OPTIONS = [
+  { label: 'Production', value: 'https://web.gamebench.net' },
+  { label: 'QA', value: 'https://gb-v2-30-0.qa.gbdev.tech' }
 ];
-
-export const getApiUrl = (baseUrl: string) => {
-  // Remove trailing slash if present
-  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-  return `${cleanBaseUrl}/v1`;
-};
-
-// Helper to create basic auth header
-export const createBasicAuth = (username: string, apiToken: string) => {
-  return `Basic ${btoa(`${username}:${apiToken}`)}`;
-};
-

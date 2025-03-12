@@ -1,7 +1,8 @@
+
 import React, { createContext, useContext, useState } from 'react';
 import { toast } from "sonner";
 import { useAuth } from './AuthContext';
-import { getApiUrl } from '@/utils/environments';
+import { getApiUrl, createBasicAuth } from '@/utils/environments';
 
 // Define session type based on GameBench API
 export interface Session {
@@ -118,31 +119,68 @@ const defaultSearchParams: SessionSearchParams = {
 };
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { apiToken, environment } = useAuth();
+  const { apiToken, username, environment, isAuthenticated } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalSessions, setTotalSessions] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [searchParams, setSearchParams] = useState<SessionSearchParams>(defaultSearchParams);
+  const [fetchInProgress, setFetchInProgress] = useState(false); // To prevent multiple simultaneous fetches
 
   const fetchSessions = async (params?: SessionSearchParams) => {
-    if (!apiToken) {
-      toast.error('API Token is required');
+    if (!isAuthenticated) {
+      console.log("Not authenticated, skipping session fetch");
       return;
     }
 
+    if (!apiToken || !username) {
+      console.log("Missing credentials, skipping session fetch");
+      return;
+    }
+
+    // Prevent multiple simultaneous requests
+    if (fetchInProgress) {
+      console.log("Fetch already in progress, skipping");
+      return;
+    }
+
+    setFetchInProgress(true);
     setIsLoading(true);
     
     try {
       const mergedParams = { ...searchParams, ...params };
       setSearchParams(mergedParams);
       
-      const response = await fetch(`${getApiUrl(environment)}/sessions`, {
-        method: 'GET',
+      const queryParams = new URLSearchParams();
+      
+      if (mergedParams.pageSize) {
+        queryParams.append('pageSize', mergedParams.pageSize.toString());
+      }
+      
+      if (mergedParams.page !== undefined) {
+        queryParams.append('page', mergedParams.page.toString());
+      }
+      
+      if (mergedParams.sort) {
+        queryParams.append('sort', mergedParams.sort);
+      }
+      
+      const apiUrl = getApiUrl(environment);
+      const url = `${apiUrl}/v1/sessions?${queryParams.toString()}`;
+      
+      console.log('Fetching sessions with URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiToken}`,
+          'Authorization': createBasicAuth(username, apiToken),
           'Content-Type': 'application/json'
         },
+        body: JSON.stringify({
+          "apps": mergedParams.apps || [],
+          "devices": mergedParams.devices || [],
+          "manufacturers": mergedParams.manufacturers || []
+        })
       });
       
       if (!response.ok) {
@@ -150,18 +188,41 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       const data = await response.json();
-      setSessions(data.sessions || []);
+      
+      // Map API response to our Session interface
+      const mappedSessions = data.sessions.map((session: any) => ({
+        id: session.id,
+        app: session.app || { name: 'Unknown', version: 'Unknown', package: 'Unknown' },
+        device: session.device || { model: 'Unknown', manufacturer: 'Unknown' },
+        metrics: session.metrics,
+        startTime: session.startTime || Date.now(),
+        duration: session.duration || 0,
+        userEmail: session.userEmail || 'Unknown',
+        // Add derived fields for display
+        appName: session.app?.name || 'Unknown',
+        appVersion: session.app?.version || 'Unknown',
+        deviceModel: session.device?.model || 'Unknown',
+        manufacturer: session.device?.manufacturer || 'Unknown',
+        recordedBy: session.userEmail || 'Unknown',
+        selected: false
+      }));
+      
+      setSessions(mappedSessions);
       setTotalSessions(data.total || 0);
       setCurrentPage(mergedParams.page || 0);
       
-      toast.success('Sessions loaded successfully');
+      toast.success(`Loaded ${mappedSessions.length} sessions successfully`);
     } catch (error) {
       console.error('Error fetching sessions:', error);
-      toast.error('Failed to fetch sessions');
+      toast.error('Failed to fetch sessions', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+        duration: 5000
+      });
       setSessions([]);
       setTotalSessions(0);
     } finally {
       setIsLoading(false);
+      setFetchInProgress(false);
     }
   };
 
@@ -180,16 +241,17 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const fetchSessionMetrics = async (sessionId: string): Promise<SessionMetrics | null> => {
-    if (!apiToken) {
-      toast.error('API Token is required');
+    if (!apiToken || !username || !isAuthenticated) {
+      toast.error('Authentication required');
       return null;
     }
 
     try {
-      const response = await fetch(`${getApiUrl(environment)}/sessions/${sessionId}`, {
+      const apiUrl = getApiUrl(environment);
+      const response = await fetch(`${apiUrl}/v1/sessions/${sessionId}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiToken}`,
+          'Authorization': createBasicAuth(username, apiToken),
           'Content-Type': 'application/json'
         }
       });
@@ -202,7 +264,10 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return data;
     } catch (error) {
       console.error('Error fetching session metrics:', error);
-      toast.error('Failed to fetch session metrics');
+      toast.error('Failed to fetch session metrics', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+        duration: 5000
+      });
       return null;
     }
   };

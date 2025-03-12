@@ -79,6 +79,7 @@ const SessionsPage = () => {
     to: undefined,
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
   
   // Check if user is authenticated, if not redirect to landing page
   useEffect(() => {
@@ -87,12 +88,14 @@ const SessionsPage = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Fetch sessions on mount
+  // Fetch sessions only once on mount if authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !initialFetchDone) {
+      console.log("Initial sessions fetch");
       fetchSessions();
+      setInitialFetchDone(true);
     }
-  }, [isAuthenticated, fetchSessions]);
+  }, [isAuthenticated, initialFetchDone, fetchSessions]);
 
   // Update isAllSelected when sessions or selectedSessions change
   useEffect(() => {
@@ -120,6 +123,25 @@ const SessionsPage = () => {
 
   const toggleSession = (sessionId: string, checked: boolean) => {
     selectSession(sessionId, checked);
+  };
+
+  const handleApplyFilters = () => {
+    const params = { ...searchParams };
+    
+    if (dateRange.from) {
+      params.dateStart = dateRange.from.getTime();
+    }
+    
+    if (dateRange.to) {
+      params.dateEnd = dateRange.to.getTime();
+    }
+    
+    // Add search query logic if needed
+    // if (searchQuery) {
+    //   // Handle search query
+    // }
+    
+    fetchSessions(params);
   };
 
   return (
@@ -254,7 +276,7 @@ const SessionsPage = () => {
           <CardFooter>
             <Button 
               className="w-full" 
-              onClick={() => fetchSessions()}
+              onClick={handleApplyFilters}
               disabled={isLoading}
             >
               Apply Filters
