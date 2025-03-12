@@ -183,6 +183,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       console.log('Request payload:', requestBody);
       
+      // Use POST with JSON body for searching sessions (as per API requirement)
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -373,19 +374,35 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const apiUrl = getApiUrl(environment);
-      const response = await fetch(`${apiUrl}/v1/sessions/${sessionId}`, {
-        method: 'GET',
+      
+      // Construct the proper URL for fetching a specific session
+      // Using GET method for fetching single session details
+      let url = `${apiUrl}/v1/sessions/${sessionId}`;
+      
+      // Add company ID as a query parameter if available
+      if (companyId) {
+        url += `?company=${companyId}`;
+      }
+      
+      console.log(`Fetching session metrics for ID ${sessionId} from ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'GET', // Use GET for fetching specific session as per API requirement
         headers: {
           'Authorization': createBasicAuth(username, apiToken),
-          'Content-Type': 'application/json'
+          'Accept': 'application/json'
+          // Note: Content-Type is omitted since GET requests shouldn't have a body
         }
       });
       
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
       }
       
       const data = await response.json();
+      console.log('Session metrics data:', data);
       return data;
     } catch (error) {
       console.error('Error fetching session metrics:', error);
