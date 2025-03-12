@@ -427,9 +427,19 @@ const LogsPage: React.FC = () => {
     if (value === null || value === undefined) {
       return <span className="text-muted-foreground">N/A</span>;
     }
+    
+    if (Array.isArray(value)) {
+      return <span>{JSON.stringify(value)}</span>;
+    }
+    
     if (typeof value === 'object') {
       return <span>{JSON.stringify(value)}</span>;
     }
+    
+    if (typeof value === 'boolean') {
+      return <span>{value ? 'Yes' : 'No'}</span>;
+    }
+    
     return <span>{String(value)}</span>;
   };
 
@@ -632,8 +642,7 @@ const LogsPage: React.FC = () => {
                                                       </div>
                                                     );
                                                   })}
-                                                </div>
-                                              </ScrollArea>
+                                                </ScrollArea>
                                             </AccordionContent>
                                           </AccordionItem>
                                         );
