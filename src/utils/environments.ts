@@ -14,3 +14,9 @@ export const getApiUrl = (baseUrl: string) => {
   const cleanBaseUrl = baseUrl.replace(/\/$/, '');
   return `${cleanBaseUrl}/v1`;
 };
+
+// Helper to create basic auth header
+export const createBasicAuth = (username: string, apiToken: string) => {
+  return `Basic ${btoa(`${username}:${apiToken}`)}`;
+};
+
