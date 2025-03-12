@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -19,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { 
   Table, 
@@ -37,21 +35,13 @@ import {
   Play, 
   Check, 
   X, 
-  FileDown, 
-  Download 
+  FileDown
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useSession, Session } from '@/context/SessionContext';
+import { useSession } from '@/context/SessionContext';
 import { LogWindow } from '@/components/LogWindow';
-
-interface ValidationRule {
-  id: string;
-  name: string;
-  metric: string;
-  condition: string;
-  value: number;
-  enabled: boolean;
-}
+import { ValidationRule, MetricField, MetricCondition } from '@/types/validation';
+import { validateRule, getDefaultRules } from '@/utils/validationUtils';
 
 interface ValidationResult {
   sessionId: string;
@@ -61,9 +51,10 @@ interface ValidationResult {
     ruleId: string;
     ruleName: string;
     passed: boolean;
-    actualValue: number | string;
+    field: string;
     expectedCondition: string;
-    expectedValue: number;
+    expectedValue: number | [number, number];
+    description?: string;
   }[];
   overallResult: 'pass' | 'fail';
 }
@@ -73,55 +64,29 @@ const Validation = () => {
   const { isAuthenticated } = useAuth();
   const { sessions } = useSession();
   
-  const [rules, setRules] = useState<ValidationRule[]>([
-    {
-      id: '1',
-      name: 'Minimum FPS',
-      metric: 'fps',
-      condition: '>=',
-      value: 30,
-      enabled: true
-    },
-    {
-      id: '2',
-      name: 'Maximum CPU Usage',
-      metric: 'cpu',
-      condition: '<',
-      value: 80,
-      enabled: true
-    },
-    {
-      id: '3',
-      name: 'Battery Drain',
-      metric: 'battery',
-      condition: '<',
-      value: 5,
-      enabled: true
-    }
-  ]);
-  
+  const [rules, setRules] = useState<ValidationRule[]>(getDefaultRules());
   const [selectedRuleSet, setSelectedRuleSet] = useState<string>('Default Rules');
-  const [ruleSets, setRuleSets] = useState<string[]>(['Default Rules', 'Performance Rules', 'Battery Rules']);
+  const [ruleSets] = useState<string[]>(['Default Rules', 'Performance Rules', 'Battery Rules']);
   
   const [newRule, setNewRule] = useState<Omit<ValidationRule, 'id'>>({
     name: '',
-    metric: 'fps',
+    field: 'fps.min',
     condition: '>=',
     value: 0,
-    enabled: true
+    enabled: true,
+    description: ''
   });
   
   const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [isValidating, setIsValidating] = useState(false);
-  
-  // Check if user is authenticated, if not redirect to landing page
+
   React.useEffect(() => {
     if (!isAuthenticated) {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
-  
+
   const addRule = () => {
     if (!newRule.name) {
       toast.error('Rule name is required');
@@ -139,10 +104,11 @@ const Validation = () => {
     // Reset form
     setNewRule({
       name: '',
-      metric: 'fps',
+      field: 'fps.min',
       condition: '>=',
       value: 0,
-      enabled: true
+      enabled: true,
+      description: ''
     });
     
     toast.success('Rule added successfully');
@@ -170,7 +136,7 @@ const Validation = () => {
         : [...prev, sessionId]
     );
   };
-  
+
   const validateSessions = () => {
     if (selectedSessions.length === 0) {
       toast.error('Please select at least one session to validate');
@@ -184,93 +150,51 @@ const Validation = () => {
     
     setIsValidating(true);
     
-    setTimeout(() => {
-      // Simulate validation process
-      const results: ValidationResult[] = selectedSessions.map(sessionId => {
-        const session = sessions.find(s => s.id === sessionId);
-        
-        if (!session) {
-          return {
-            sessionId,
-            appName: 'Unknown',
-            deviceModel: 'Unknown',
-            rules: [],
-            overallResult: 'fail'
-          };
-        }
-        
-        const ruleResults = rules
-          .filter(rule => rule.enabled)
-          .map(rule => {
-            let actualValue: number = 0;
-            let passed = false;
-            
-            // Extract the actual value based on the metric
-            switch (rule.metric) {
-              case 'fps':
-                actualValue = session.metrics?.fps?.avg || 0;
-                break;
-              case 'cpu':
-                actualValue = session.metrics?.cpu?.avg || 0;
-                break;
-              case 'memory':
-                actualValue = session.metrics?.memory?.avg || 0;
-                break;
-              case 'battery':
-                actualValue = session.metrics?.battery?.drain || 0;
-                break;
-              default:
-                actualValue = 0;
-            }
-            
-            // Determine if the rule passed based on the condition
-            switch (rule.condition) {
-              case '>':
-                passed = actualValue > rule.value;
-                break;
-              case '>=':
-                passed = actualValue >= rule.value;
-                break;
-              case '<':
-                passed = actualValue < rule.value;
-                break;
-              case '<=':
-                passed = actualValue <= rule.value;
-                break;
-              case '==':
-                passed = actualValue === rule.value;
-                break;
-              default:
-                passed = false;
-            }
-            
-            return {
-              ruleId: rule.id,
-              ruleName: rule.name,
-              passed,
-              actualValue,
-              expectedCondition: rule.condition,
-              expectedValue: rule.value
-            };
-          });
-        
+    const results = selectedSessions.map(sessionId => {
+      const session = sessions.find(s => s.id === sessionId);
+      
+      if (!session) {
         return {
           sessionId,
-          appName: session.app.name,
-          deviceModel: session.device.model,
-          rules: ruleResults,
-          overallResult: ruleResults.every(r => r.passed) ? 'pass' : 'fail'
+          appName: 'Unknown',
+          deviceModel: 'Unknown',
+          rules: [],
+          overallResult: 'fail' as const
         };
-      });
+      }
+
+      const ruleResults = rules
+        .filter(rule => rule.enabled)
+        .map(rule => {
+          const passed = validateRule(session, rule);
+          
+          return {
+            ruleId: rule.id,
+            ruleName: rule.name,
+            passed,
+            field: rule.field,
+            expectedCondition: rule.condition,
+            expectedValue: rule.value,
+            description: rule.description
+          };
+        });
       
-      setValidationResults(results);
-      setIsValidating(false);
-      
-      const passedCount = results.filter(r => r.overallResult === 'pass').length;
-      const failedCount = results.length - passedCount;
-      
-      toast.success(`Validation complete: ${passedCount} passed, ${failedCount} failed`);
-    }, 1500);
+      return {
+        sessionId,
+        appName: session.app?.name || 'Unknown',
+        deviceModel: session.device?.model || 'Unknown',
+        rules: ruleResults,
+        overallResult: ruleResults.every(r => r.passed) ? 'pass' as const : 'fail' as const
+      };
+    });
+    
+    setValidationResults(results);
+    setIsValidating(false);
+    
+    const passedCount = results.filter(r => r.overallResult === 'pass').length;
+    const failedCount = results.length - passedCount;
+    
+    toast.success(`Validation complete: ${passedCount} passed, ${failedCount} failed`);
   };
   
   const exportResults = () => {
@@ -372,13 +296,22 @@ const Validation = () => {
                   <select 
                     id="metric"
                     className="w-full p-2 border rounded"
-                    value={newRule.metric}
-                    onChange={(e) => setNewRule({...newRule, metric: e.target.value})}
+                    value={newRule.field}
+                    onChange={(e) => setNewRule({...newRule, field: e.target.value as MetricField})}
                   >
-                    <option value="fps">FPS</option>
-                    <option value="cpu">CPU Usage</option>
-                    <option value="memory">Memory Usage</option>
-                    <option value="battery">Battery Drain</option>
+                    <option value="fps.min">FPS (Minimum)</option>
+                    <option value="fps.max">FPS (Maximum)</option>
+                    <option value="fps.median">FPS (Median)</option>
+                    <option value="fps.stability">FPS Stability</option>
+                    <option value="cpu.min">CPU Usage (Minimum)</option>
+                    <option value="cpu.max">CPU Usage (Maximum)</option>
+                    <option value="cpu.avg">CPU Usage (Average)</option>
+                    <option value="androidMemory.avg">Memory Usage (Average)</option>
+                    <option value="androidMemory.max">Memory Usage (Maximum)</option>
+                    <option value="battery.drain">Battery Drain</option>
+                    <option value="power.usage">Power Usage</option>
+                    <option value="app.launchTime">Launch Time</option>
+                    <option value="app.size">App Size</option>
                   </select>
                 </div>
                 
@@ -388,13 +321,17 @@ const Validation = () => {
                     id="condition"
                     className="w-full p-2 border rounded"
                     value={newRule.condition}
-                    onChange={(e) => setNewRule({...newRule, condition: e.target.value})}
+                    onChange={(e) => setNewRule({...newRule, condition: e.target.value as MetricCondition})}
                   >
                     <option value=">">Greater Than (&gt;)</option>
                     <option value=">=">Greater Than or Equal (&gt;=)</option>
                     <option value="<">Less Than (&lt;)</option>
                     <option value="<=">Less Than or Equal (&lt;=)</option>
                     <option value="==">Equal To (==)</option>
+                    <option value="!=">Not Equal To (!=)</option>
+                    <option value="between">Between</option>
+                    <option value="exists">Exists</option>
+                    <option value="not_null">Not Null</option>
                   </select>
                 </div>
                 
@@ -403,7 +340,7 @@ const Validation = () => {
                   <Input 
                     id="value" 
                     type="number"
-                    value={newRule.value}
+                    value={newRule.value as number}
                     onChange={(e) => setNewRule({...newRule, value: parseFloat(e.target.value)})}
                   />
                 </div>
@@ -446,7 +383,7 @@ const Validation = () => {
                         />
                       </TableCell>
                       <TableCell>{rule.name}</TableCell>
-                      <TableCell>{rule.metric.toUpperCase()}</TableCell>
+                      <TableCell>{rule.field}</TableCell>
                       <TableCell>{rule.condition}</TableCell>
                       <TableCell>{rule.value}</TableCell>
                       <TableCell>
@@ -608,7 +545,7 @@ const Validation = () => {
                               <TableCell>
                                 {rule.expectedCondition} {rule.expectedValue}
                               </TableCell>
-                              <TableCell>{rule.actualValue}</TableCell>
+                              <TableCell>{rule.field}</TableCell>
                               <TableCell>
                                 {rule.passed ? (
                                   <Check className="h-4 w-4 text-green-500" />
