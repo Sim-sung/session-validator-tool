@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Card, 
   CardHeader, 
@@ -40,17 +39,13 @@ const formatDataForChart = (data: number[] | undefined, type: string) => {
 
 const MetricsPage = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { sessionId } = useParams<{ sessionId: string }>();
   const { isAuthenticated } = useAuth();
-  const { fetchSessionMetrics, saveSessionMetricsForValidation } = useSession();
+  const { fetchSessionMetrics, saveSessionMetricsForValidation, downloadSession } = useSession();
   
   const [isLoading, setIsLoading] = useState(false);
   const [sessionMetrics, setSessionMetrics] = useState<SessionMetrics | null>(null);
   const [activeTab, setActiveTab] = useState('summary');
-  
-  // Parse sessionId from query params
-  const searchParams = new URLSearchParams(location.search);
-  const sessionId = searchParams.get('sessionId');
   
   // Check if user is authenticated, if not redirect to landing page
   useEffect(() => {
@@ -86,6 +81,14 @@ const MetricsPage = () => {
     }
   };
 
+  const handleDownloadSession = () => {
+    if (sessionId) {
+      downloadSession(sessionId);
+    } else {
+      toast.error('No session ID available');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -115,6 +118,7 @@ const MetricsPage = () => {
           <Button
             size="sm"
             variant="outline"
+            onClick={handleDownloadSession}
             disabled={!sessionMetrics || isLoading}
           >
             <Download className="h-4 w-4 mr-2" />

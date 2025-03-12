@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState } from 'react';
 import { toast } from "sonner";
 import { useAuth } from './AuthContext';
@@ -93,6 +92,7 @@ interface SessionContextType {
   fetchSessionMetrics: (sessionId: string) => Promise<SessionMetrics | null>;
   saveSessionMetricsForValidation: (metrics: SessionMetrics) => void;
   setSessions: (sessions: Session[]) => void;
+  downloadSession: (sessionId: string) => Promise<void>;
 }
 
 // Export the context and its hook
@@ -414,6 +414,66 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Function to download a session
+  const downloadSession = async (sessionId: string): Promise<void> => {
+    if (!isAuthenticated || !apiToken || !username) {
+      toast.error('Authentication required to download session');
+      return;
+    }
+
+    try {
+      const apiUrl = getApiUrl(environment);
+      let url = `${apiUrl}/sessions/export/sessions/${sessionId}`;
+      
+      // Add company ID as a query parameter if available
+      if (companyId) {
+        url += `?company=${companyId}`;
+      }
+      
+      console.log(`Downloading session with ID ${sessionId} from ${url}`);
+      
+      // Use fetch with GET method to download the file
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': createBasicAuth(username, apiToken),
+          'Accept': 'application/zip, application/octet-stream'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+      
+      // Convert the response to a blob
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const downloadUrl = window.URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element to trigger the download
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `session-${sessionId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+      
+      toast.success('Session downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading session:', error);
+      toast.error('Failed to download session', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+        duration: 5000
+      });
+    }
+  };
+
   // Function to save session metrics for validation
   const saveSessionMetricsForValidation = (metrics: SessionMetrics) => {
     // In a real implementation, this would save to local storage or a database
@@ -441,6 +501,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         fetchSessionMetrics,
         saveSessionMetricsForValidation,
         setSessions,
+        downloadSession,
       }}
     >
       {children}

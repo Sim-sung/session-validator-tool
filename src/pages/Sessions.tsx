@@ -42,6 +42,7 @@ import {
   Clock 
 } from 'lucide-react';
 import { LogWindow } from '@/components/LogWindow';
+import { toast } from 'sonner';
 
 const formatDuration = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);
@@ -69,7 +70,8 @@ const SessionsPage = () => {
     selectAllSessions, 
     setSearchParams, 
     resetSearchParams,
-    setSessions
+    setSessions,
+    downloadSession
   } = useSession();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -117,8 +119,30 @@ const SessionsPage = () => {
   };
 
   const downloadSelectedSessions = () => {
-    // Implement your download logic here
-    console.log('Downloading selected sessions...');
+    if (selectedSessions.length === 0) {
+      toast.error('No sessions selected');
+      return;
+    }
+    
+    // If only one session is selected, download it directly
+    if (selectedSessions.length === 1) {
+      downloadSession(selectedSessions[0].id);
+      return;
+    }
+    
+    // For multiple sessions, we would need to download them one by one
+    // This could be improved with a batch download API if available
+    toast.info(`Downloading ${selectedSessions.length} sessions...`);
+    selectedSessions.forEach((session, index) => {
+      // Add a small delay to prevent overwhelming the browser with downloads
+      setTimeout(() => {
+        downloadSession(session.id);
+      }, index * 1000);
+    });
+  };
+
+  const handleDownloadSession = (sessionId: string) => {
+    downloadSession(sessionId);
   };
 
   const toggleSession = (sessionId: string, checked: boolean) => {
@@ -421,7 +445,7 @@ const SessionsPage = () => {
                               <Button 
                                 size="sm" 
                                 variant="outline"
-                                onClick={() => downloadSelectedSessions()}
+                                onClick={() => handleDownloadSession(session.id)}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>
