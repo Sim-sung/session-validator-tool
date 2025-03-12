@@ -84,16 +84,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
 
+    if (!environment) {
+      toast.error('Environment URL is required');
+      return false;
+    }
+
     setIsValidating(true);
     
+    // Create a timeout promise that will reject after 10 seconds
+    const timeoutPromise = new Promise<Response>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout: Server did not respond within 10 seconds')), 10000);
+    });
+    
     try {
-      const response = await fetch(`${getApiUrl(environment)}/me`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Race between the actual fetch and the timeout
+      const response = await Promise.race([
+        fetch(`${getApiUrl(environment)}/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiToken}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        timeoutPromise
+      ]);
 
       if (response.ok) {
         setIsAuthenticated(true);
@@ -102,12 +116,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setIsAuthenticated(false);
         
+        let errorDetails = '';
+        try {
+          const errorData = await response.json();
+          errorDetails = JSON.stringify(errorData, null, 2);
+        } catch (e) {
+          errorDetails = `Status: ${response.status} - ${response.statusText}`;
+        }
+        
         if (response.status === 401) {
-          toast.error('Invalid API credentials - Authentication failed');
+          toast.error(`Invalid API credentials - Authentication failed\n\nTechnical details: ${errorDetails}`);
         } else if (response.status === 403) {
-          toast.error('Permission denied - Check your access rights');
+          toast.error(`Permission denied - Check your access rights\n\nTechnical details: ${errorDetails}`);
         } else {
-          toast.error(`API validation failed (${response.status})`);
+          toast.error(`API validation failed (${response.status})\n\nTechnical details: ${errorDetails}`);
         }
         
         return false;
@@ -115,7 +137,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error validating credentials:', error);
       setIsAuthenticated(false);
-      toast.error('Failed to validate API credentials - Network or server error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to validate API credentials - ${errorMessage}`);
       return false;
     } finally {
       setIsValidating(false);
