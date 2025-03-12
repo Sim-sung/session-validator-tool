@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [apiToken, setApiToken] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [username, setUsername] = useState('');
-  const [environment, setEnvironment] = useState('https://api.gamebench.net');
+  const [environment, setEnvironment] = useState('https://web.gamebench.net');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
 
@@ -97,9 +97,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     try {
+      const apiUrl = getApiUrl(environment);
+      console.log('Attempting to validate credentials with URL:', apiUrl); // Debug log
+      
       // Race between the actual fetch and the timeout
       const response = await Promise.race([
-        fetch(`${getApiUrl(environment)}/me`, {
+        fetch(`${apiUrl}/me`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${apiToken}`,
@@ -124,21 +127,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           errorDetails = `Status: ${response.status} - ${response.statusText}`;
         }
         
+        let userMessage = '';
         if (response.status === 401) {
-          toast.error(`Invalid API credentials - Authentication failed\n\nTechnical details: ${errorDetails}`);
+          userMessage = 'Invalid API credentials - Authentication failed';
         } else if (response.status === 403) {
-          toast.error(`Permission denied - Check your access rights\n\nTechnical details: ${errorDetails}`);
+          userMessage = 'Permission denied - Check your access rights';
         } else {
-          toast.error(`API validation failed (${response.status})\n\nTechnical details: ${errorDetails}`);
+          userMessage = `API validation failed (${response.status})`;
         }
         
+        toast.error(`${userMessage}\n\nTechnical details:\n${errorDetails}`);
         return false;
       }
     } catch (error) {
       console.error('Error validating credentials:', error);
       setIsAuthenticated(false);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to validate API credentials - ${errorMessage}`);
+      toast.error(`Failed to validate API credentials\n\nTechnical details: ${errorMessage}`);
       return false;
     } finally {
       setIsValidating(false);

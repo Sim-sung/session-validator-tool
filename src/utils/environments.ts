@@ -5,10 +5,12 @@ export interface Environment {
 }
 
 export const environments: Environment[] = [
-  { label: 'Production', baseUrl: 'https://api.gamebench.net' },
+  { label: 'Production', baseUrl: 'https://web.gamebench.net' },
   { label: 'QA (v2-30-0)', baseUrl: 'https://gb-v2-30-0.qa.gbdev.tech' },
 ];
 
 export const getApiUrl = (baseUrl: string) => {
-  return `${baseUrl}/v1`;
+  // Remove trailing slash if present
+  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+  return `${cleanBaseUrl}/v1`;
 };

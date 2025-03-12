@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -12,8 +11,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useAuth } from '@/context/AuthContext';
 import { Shield, AlertCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { environments } from '@/utils/environments';
 import { toast } from 'sonner';
 
 const Index = () => {
@@ -87,23 +94,32 @@ const Index = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="environment" className="text-gray-300">Environment URL</Label>
-            <Input
-              id="environment"
-              placeholder="Enter your environment URL"
+            <Label htmlFor="environment-select" className="text-gray-300">Environment</Label>
+            <Select
               value={localEnvironment}
-              onChange={(e) => setLocalEnvironment(e.target.value)}
-              className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-500"
-            />
-            <p className="text-xs text-gray-500">
-              Example: https://gb-v2-30-0.qa.gbdev.tech or https://api.gamebench.net
-            </p>
+              onValueChange={setLocalEnvironment}
+            >
+              <SelectTrigger id="environment-select" className="bg-gray-700 border-gray-600 text-white">
+                <SelectValue placeholder="Select environment" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                {environments.map((env) => (
+                  <SelectItem 
+                    key={env.baseUrl} 
+                    value={env.baseUrl}
+                    className="text-white hover:bg-gray-700"
+                  >
+                    {env.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="api-token" className="text-gray-300">API Token (Required)</Label>
+            <Label htmlFor="api-token-field" className="text-gray-300">API Token (Required)</Label>
             <Input
-              id="api-token"
+              id="api-token-field"
               type="password"
               placeholder="Enter your API token"
               value={localApiToken}
