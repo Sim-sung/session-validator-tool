@@ -80,6 +80,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       LOCAL_STORAGE_KEY,
       JSON.stringify({ apiToken, companyId, username, environment })
     );
+    
+    // Set authenticated if we have a token and username
+    if (apiToken && username) {
+      setIsAuthenticated(true);
+    }
   };
 
   const validateCredentials = async (): Promise<boolean> => {

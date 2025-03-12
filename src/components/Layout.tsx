@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -12,11 +12,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<string>(location.pathname);
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-  };
+  // Update activeTab when location changes
+  useEffect(() => {
+    setActiveTab(location.pathname);
+  }, [location.pathname]);
 
-  // Updated navItems to match the 4 tabs without logs
+  // Updated navItems to match the tabs without logs
   const navItems = [
     {
       value: '/',
@@ -73,7 +74,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="container flex justify-center pb-2">
           <Tabs
             value={activeTab}
-            onValueChange={handleTabChange}
+            onValueChange={setActiveTab}
             className="w-full max-w-3xl"
           >
             <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${filteredNavItems.length}, 1fr)` }}>
@@ -83,7 +84,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     value={item.value}
                     className={cn(
                       "flex items-center justify-center transition-all",
-                      location.pathname === item.value
+                      activeTab === item.value || 
+                      (activeTab.startsWith('/metrics') && item.value === '/metrics')
                         ? "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                         : ""
                     )}

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -28,6 +29,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useAuth } from '@/context/AuthContext';
 import { useSession, Session } from '@/context/SessionContext';
 import { format } from 'date-fns';
@@ -37,7 +46,6 @@ import {
   RefreshCw, 
   Download, 
   Trash2, 
-  ChevronDown, 
   Info, 
   Clock 
 } from 'lucide-react';
@@ -93,7 +101,6 @@ const SessionsPage = () => {
   // Fetch sessions only once on mount if authenticated
   useEffect(() => {
     if (isAuthenticated && !initialFetchDone) {
-      console.log("Initial sessions fetch");
       fetchSessions();
       setInitialFetchDone(true);
     }
@@ -131,7 +138,6 @@ const SessionsPage = () => {
     }
     
     // For multiple sessions, we would need to download them one by one
-    // This could be improved with a batch download API if available
     toast.info(`Downloading ${selectedSessions.length} sessions...`);
     selectedSessions.forEach((session, index) => {
       // Add a small delay to prevent overwhelming the browser with downloads
@@ -159,11 +165,6 @@ const SessionsPage = () => {
     if (dateRange.to) {
       params.dateEnd = dateRange.to.getTime();
     }
-    
-    // Add search query logic if needed
-    // if (searchQuery) {
-    //   // Handle search query
-    // }
     
     fetchSessions(params);
   };
@@ -349,115 +350,108 @@ const SessionsPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
-              <div className="relative w-full overflow-auto">
-                <table className="w-full caption-bottom text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="h-12 px-4 text-left align-middle font-medium">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            checked={isAllSelected} 
-                            onCheckedChange={handleToggleAll}
-                            id="select-all"
-                          />
-                          <label 
-                            htmlFor="select-all"
-                            className="text-xs font-medium text-muted-foreground"
-                          >
-                            SELECT ALL
-                          </label>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        checked={isAllSelected} 
+                        onCheckedChange={handleToggleAll}
+                        id="select-all"
+                      />
+                      <label 
+                        htmlFor="select-all"
+                        className="text-xs font-medium text-muted-foreground"
+                      >
+                        SELECT ALL
+                      </label>
+                    </div>
+                  </TableHead>
+                  <TableHead>App</TableHead>
+                  <TableHead>Device</TableHead>
+                  <TableHead>Recorded By</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sessions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      {isLoading ? (
+                        <div className="flex justify-center items-center h-full">
+                          <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
-                      </th>
-                      <th className="h-12 px-4 text-left align-middle font-medium">App</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium">Device</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium">Recorded By</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium">Date</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium">Duration</th>
-                      <th className="h-12 px-4 text-left align-middle font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessions.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="h-24 text-center">
-                          {isLoading ? (
-                            <div className="flex justify-center items-center h-full">
-                              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center h-full">
-                              <Info className="h-10 w-10 text-muted-foreground mb-2" />
-                              <p className="text-muted-foreground">No sessions found</p>
-                              <Button 
-                                variant="link" 
-                                onClick={() => fetchSessions()}
-                                className="mt-2"
-                              >
-                                Refresh
-                              </Button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ) : (
-                      sessions.map((session: Session) => (
-                        <tr 
-                          key={session.id} 
-                          className="border-b hover:bg-muted/50 transition-colors"
-                        >
-                          <td className="p-4 align-middle">
-                            <Checkbox 
-                              checked={session.selected} 
-                              onCheckedChange={(checked) => toggleSession(session.id, !!checked)}
-                            />
-                          </td>
-                          <td className="p-4 align-middle">
-                            <div className="font-medium">{session.appName}</div>
-                            <div className="text-xs text-muted-foreground">v{session.appVersion}</div>
-                          </td>
-                          <td className="p-4 align-middle">
-                            <div className="font-medium">{session.deviceModel}</div>
-                            <div className="text-xs text-muted-foreground">{session.manufacturer}</div>
-                          </td>
-                          <td className="p-4 align-middle">{session.recordedBy}</td>
-                          <td className="p-4 align-middle">
-                            {format(new Date(session.startTime), "MMM dd, yyyy")}
-                            <div className="text-xs text-muted-foreground">
-                              {format(new Date(session.startTime), "hh:mm a")}
-                            </div>
-                          </td>
-                          <td className="p-4 align-middle">
-                            <div className="flex items-center space-x-1">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <span>{formatDuration(session.duration)}</span>
-                            </div>
-                          </td>
-                          <td className="p-4 align-middle">
-                            <div className="flex items-center space-x-2">
-                              <Button 
-                                size="sm" 
-                                variant="secondary"
-                                onClick={() => handleViewSessionDetails(session.id)}
-                              >
-                                Details
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleDownloadSession(session.id)}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full">
+                          <Info className="h-10 w-10 text-muted-foreground mb-2" />
+                          <p className="text-muted-foreground">No sessions found</p>
+                          <Button 
+                            variant="link" 
+                            onClick={() => fetchSessions()}
+                            className="mt-2"
+                          >
+                            Refresh
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sessions.map((session: Session) => (
+                    <TableRow key={session.id}>
+                      <TableCell>
+                        <Checkbox 
+                          checked={session.selected} 
+                          onCheckedChange={(checked) => toggleSession(session.id, !!checked)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{session.appName}</div>
+                        <div className="text-xs text-muted-foreground">v{session.appVersion}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{session.deviceModel}</div>
+                        <div className="text-xs text-muted-foreground">{session.manufacturer}</div>
+                      </TableCell>
+                      <TableCell>{session.recordedBy}</TableCell>
+                      <TableCell>
+                        {format(new Date(session.startTime), "MMM dd, yyyy")}
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(session.startTime), "hh:mm a")}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span>{formatDuration(session.duration)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="secondary"
+                            onClick={() => handleViewSessionDetails(session.id)}
+                          >
+                            Details
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleDownloadSession(session.id)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
