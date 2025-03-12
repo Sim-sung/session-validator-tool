@@ -428,9 +428,9 @@ const LogsPage: React.FC = () => {
       return <span className="text-muted-foreground">N/A</span>;
     }
     if (typeof value === 'object') {
-      return JSON.stringify(value);
+      return <span>{JSON.stringify(value)}</span>;
     }
-    return String(value);
+    return <span>{String(value)}</span>;
   };
 
   return (
