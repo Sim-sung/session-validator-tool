@@ -16,6 +16,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setActiveTab(value);
   };
 
+  // Updated navItems to match the 5 tabs in the spec
   const navItems = [
     {
       value: '/',
@@ -34,6 +35,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       label: 'Metrics',
       icon: <LineChart className="h-4 w-4 mr-2" />,
       showWhenAuth: true,
+      hideFromNav: true, // Hide from nav as it requires a sessionId
     },
     {
       value: '/validation',
@@ -50,7 +52,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   ];
 
   const filteredNavItems = navItems.filter(
-    item => item.showAlways || (item.showWhenAuth && isAuthenticated)
+    item => (item.showAlways || (item.showWhenAuth && isAuthenticated)) && !item.hideFromNav
   );
 
   return (
