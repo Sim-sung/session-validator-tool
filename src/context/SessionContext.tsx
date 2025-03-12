@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState } from 'react';
 import { toast } from "sonner";
 import { useAuth } from './AuthContext';
@@ -174,16 +173,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       console.log('Fetching sessions with URL:', url);
       
-      // Prepare the request body exactly as in the curl example
-      const requestBody = {
-        apps: mergedParams.apps || [],
-        devices: mergedParams.devices || [], 
-        manufacturers: mergedParams.manufacturers || []
-      };
-      
-      console.log('Request payload:', requestBody);
-      
-      // Use POST with JSON body for searching sessions (as per API requirement)
+      // Using the format that was working previously
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -191,7 +181,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({})  // Send an empty object instead of one with empty arrays
       });
       
       if (!response.ok) {
