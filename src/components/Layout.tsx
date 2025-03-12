@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LayoutGrid, LineChart, Settings, Shield, FileText, LogOut } from 'lucide-react';
+import { LayoutGrid, LineChart, Settings, Shield, LogOut } from 'lucide-react';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -16,7 +16,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setActiveTab(value);
   };
 
-  // Updated navItems to match the 5 tabs in the spec
+  // Updated navItems to match the 4 tabs without logs
   const navItems = [
     {
       value: '/',
@@ -41,12 +41,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       value: '/validation',
       label: 'Validation',
       icon: <Shield className="h-4 w-4 mr-2" />,
-      showWhenAuth: true,
-    },
-    {
-      value: '/logs',
-      label: 'Logs',
-      icon: <FileText className="h-4 w-4 mr-2" />,
       showWhenAuth: true,
     },
   ];
