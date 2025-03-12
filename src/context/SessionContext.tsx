@@ -153,20 +153,18 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       const queryParams = new URLSearchParams();
       
-      if (mergedParams.pageSize) {
-        queryParams.append('pageSize', mergedParams.pageSize.toString());
-      }
+      // Always include pageSize
+      queryParams.append('pageSize', (mergedParams.pageSize || 15).toString());
       
+      // Add page if defined
       if (mergedParams.page !== undefined) {
         queryParams.append('page', mergedParams.page.toString());
       }
       
-      if (mergedParams.sort) {
-        queryParams.append('sort', mergedParams.sort);
-      }
+      // Always include sort parameter
+      queryParams.append('sort', mergedParams.sort || 'timePushed:desc');
       
-      // Always include company ID for company-wide session views as mentioned in the API docs
-      // Add company ID to query params if available
+      // Always include company ID if available
       if (companyId) {
         queryParams.append('company', companyId);
       }
@@ -175,11 +173,15 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const url = `${apiUrl}/v1/sessions?${queryParams.toString()}`;
       
       console.log('Fetching sessions with URL:', url);
-      console.log('Request payload:', {
+      
+      // Prepare the request body exactly as in the curl example
+      const requestBody = {
         apps: mergedParams.apps || [],
-        devices: mergedParams.devices || [],
+        devices: mergedParams.devices || [], 
         manufacturers: mergedParams.manufacturers || []
-      });
+      };
+      
+      console.log('Request payload:', requestBody);
       
       const response = await fetch(url, {
         method: 'POST',
@@ -188,12 +190,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        // Ensure the structure matches exactly what the API expects
-        body: JSON.stringify({
-          apps: mergedParams.apps || [],
-          devices: mergedParams.devices || [],
-          manufacturers: mergedParams.manufacturers || []
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
@@ -203,19 +200,17 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       const data = await response.json();
-      console.log('Response data structure:', Object.keys(data));
+      console.log('Response data:', data);
       
-      // Check if data exists and has the expected structure
       if (!data) {
         throw new Error('Invalid response: empty data');
       }
       
-      // Map API response to our Session interface based on the actual response structure
+      // Map API response to our Session interface
       let mappedSessions: Session[] = [];
       
       if (Array.isArray(data.results)) {
-        // Handle response format with 'results' array
-        console.log('Using results array format');
+        console.log('Processing results array format with', data.results.length, 'items');
         mappedSessions = data.results.map((session: any) => ({
           id: session.id || session.uuid || 'unknown',
           app: {
@@ -256,8 +251,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         setTotalSessions(data.totalHits || data.totalPages || mappedSessions.length);
       } else if (Array.isArray(data.sessions)) {
-        // Handle response format with 'sessions' array
-        console.log('Using sessions array format');
+        console.log('Processing sessions array format with', data.sessions.length, 'items');
         mappedSessions = data.sessions.map((session: any) => ({
           id: session.id || 'unknown',
           app: {
@@ -289,8 +283,54 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         setTotalSessions(data.total || mappedSessions.length);
       } else {
-        console.warn('Unexpected API response format:', data);
-        throw new Error('Invalid response format: sessions or results array not found');
+        // Handle case when API returns a single object or an array without results/sessions wrapper
+        console.log('Unexpected API response format, attempting to process raw data');
+        
+        if (Array.isArray(data)) {
+          // If data is a direct array of sessions
+          console.log('Processing direct array with', data.length, 'items');
+          mappedSessions = data.map((session: any) => ({
+            id: session.id || session.uuid || 'unknown',
+            app: {
+              name: session.app?.name || 'Unknown',
+              version: session.app?.version || 'Unknown',
+              package: session.app?.packageName || session.app?.package || 'Unknown'
+            },
+            device: {
+              model: session.device?.model || 'Unknown',
+              manufacturer: session.device?.manufacturer || 'Unknown'
+            },
+            metrics: {
+              fps: {
+                avg: session.fpsMedian || 0,
+                stability: session.fpsStability || 0
+              },
+              cpu: {
+                avg: session.cpuUsageAvg || 0
+              },
+              memory: {
+                avg: session.androidMemUsageAvg || session.memUsageAvg || 0
+              },
+              battery: {
+                drain: session.powerUsage || 0
+              }
+            },
+            startTime: session.sessionDate || session.timePushed || Date.now(),
+            duration: session.timePlayed || 0,
+            userEmail: session.user?.userPlayAccount || session.originalUser?.userPlayAccount || 'Unknown',
+            appName: session.app?.name || 'Unknown',
+            appVersion: session.app?.version || 'Unknown',
+            deviceModel: session.device?.model || 'Unknown',
+            manufacturer: session.device?.manufacturer || 'Unknown',
+            recordedBy: session.user?.userPlayAccount || session.originalUser?.userPlayAccount || 'Unknown',
+            selected: false
+          }));
+          
+          setTotalSessions(mappedSessions.length);
+        } else {
+          console.warn('Cannot process API response:', data);
+          throw new Error('Invalid response format: sessions data not found');
+        }
       }
       
       setSessions(mappedSessions);
