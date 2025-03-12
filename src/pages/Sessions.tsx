@@ -42,8 +42,6 @@ import {
   Clock 
 } from 'lucide-react';
 import { LogWindow } from '@/components/LogWindow';
-import { getApiUrl, createBasicAuth } from '@/utils/environments';
-import { toast } from 'sonner';
 
 const formatDuration = (seconds: number): string => {
   const minutes = Math.floor(seconds / 60);
@@ -58,7 +56,7 @@ const formatDuration = (seconds: number): string => {
 
 const SessionsPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, username, apiToken, environment, companyId } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { 
     sessions, 
     isLoading, 
@@ -82,14 +80,15 @@ const SessionsPage = () => {
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [initialFetchDone, setInitialFetchDone] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   
+  // Check if user is authenticated, if not redirect to landing page
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
 
+  // Fetch sessions only once on mount if authenticated
   useEffect(() => {
     if (isAuthenticated && !initialFetchDone) {
       console.log("Initial sessions fetch");
@@ -109,7 +108,6 @@ const SessionsPage = () => {
   };
 
   const handleViewSessionDetails = (sessionId: string) => {
-    // Fixed: Navigate to the metrics page with the correct path
     navigate(`/metrics/${sessionId}`);
   };
 
@@ -118,96 +116,9 @@ const SessionsPage = () => {
     setSessions(sessions.filter((session) => !sessionIdsToDelete.includes(session.id)));
   };
 
-  const downloadSession = async (sessionId: string) => {
-    if (!apiToken || !username) {
-      toast.error('Authentication required');
-      return;
-    }
-
-    try {
-      setIsDownloading(true);
-      const apiUrl = getApiUrl(environment);
-      
-      // Construct the proper download URL using the export endpoint
-      let url = `${apiUrl}/v1/sessions/export/sessions/${sessionId}`;
-      
-      // Add company ID as a query parameter if available
-      if (companyId) {
-        url += `?company=${companyId}`;
-      }
-      
-      console.log(`Downloading session with ID ${sessionId} from ${url}`);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': createBasicAuth(username, apiToken),
-          'Accept': '*/*'
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
-        throw new Error(`Download failed with status ${response.status}: ${errorText}`);
-      }
-      
-      // Handle the binary response (zip file)
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `session_${sessionId}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(downloadUrl);
-      document.body.removeChild(a);
-      
-      toast.success('Session downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading session:', error);
-      toast.error('Failed to download session', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-        duration: 5000
-      });
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const downloadSelectedSessions = async () => {
-    if (selectedSessions.length === 0) {
-      toast.info('No sessions selected');
-      return;
-    }
-    
-    // If only one session is selected, download it directly
-    if (selectedSessions.length === 1) {
-      await downloadSession(selectedSessions[0].id);
-      return;
-    }
-    
-    // For multiple sessions, download them sequentially
-    setIsDownloading(true);
-    
-    try {
-      toast.info(`Downloading ${selectedSessions.length} sessions...`);
-      
-      // Download each session one by one
-      for (const session of selectedSessions) {
-        await downloadSession(session.id);
-      }
-      
-      toast.success(`${selectedSessions.length} sessions downloaded successfully`);
-    } catch (error) {
-      console.error('Error downloading multiple sessions:', error);
-      toast.error('Some downloads failed', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-        duration: 5000
-      });
-    } finally {
-      setIsDownloading(false);
-    }
+  const downloadSelectedSessions = () => {
+    // Implement your download logic here
+    console.log('Downloading selected sessions...');
   };
 
   const toggleSession = (sessionId: string, checked: boolean) => {
@@ -394,9 +305,9 @@ const SessionsPage = () => {
                       size="sm"
                       variant="outline"
                       onClick={downloadSelectedSessions}
-                      disabled={isLoading || isDownloading}
+                      disabled={isLoading}
                     >
-                      <Download className={`h-4 w-4 mr-2 ${isDownloading ? 'animate-spin' : ''}`} />
+                      <Download className="h-4 w-4 mr-2" />
                       Download {selectedSessions.length}
                     </Button>
                     <Button
@@ -510,10 +421,9 @@ const SessionsPage = () => {
                               <Button 
                                 size="sm" 
                                 variant="outline"
-                                onClick={() => downloadSession(session.id)}
-                                disabled={isDownloading}
+                                onClick={() => downloadSelectedSessions()}
                               >
-                                <Download className={`h-4 w-4 ${isDownloading ? 'animate-spin' : ''}`} />
+                                <Download className="h-4 w-4" />
                               </Button>
                             </div>
                           </td>
@@ -528,6 +438,7 @@ const SessionsPage = () => {
         </Card>
       </div>
       
+      {/* Delete confirmation dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

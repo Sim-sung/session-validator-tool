@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Card, 
   CardHeader, 
@@ -27,8 +27,6 @@ import {
   Battery, 
   WifiIcon
 } from 'lucide-react';
-import { toast } from 'sonner';
-import { getApiUrl, createBasicAuth } from '@/utils/environments';
 
 // Helper function to format the data for charts
 const formatDataForChart = (data: number[] | undefined, type: string) => {
@@ -42,14 +40,17 @@ const formatDataForChart = (data: number[] | undefined, type: string) => {
 
 const MetricsPage = () => {
   const navigate = useNavigate();
-  const { sessionId } = useParams<{ sessionId: string }>(); // Get sessionId from URL params instead of query
-  const { isAuthenticated, username, apiToken, environment, companyId } = useAuth();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const { fetchSessionMetrics, saveSessionMetricsForValidation } = useSession();
   
   const [isLoading, setIsLoading] = useState(false);
   const [sessionMetrics, setSessionMetrics] = useState<SessionMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState('fps');
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [activeTab, setActiveTab] = useState('summary');
+  
+  // Parse sessionId from query params
+  const searchParams = new URLSearchParams(location.search);
+  const sessionId = searchParams.get('sessionId');
   
   // Check if user is authenticated, if not redirect to landing page
   useEffect(() => {
@@ -74,10 +75,6 @@ const MetricsPage = () => {
       }
     } catch (error) {
       console.error('Error loading session metrics:', error);
-      toast.error('Failed to load session metrics', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-        duration: 5000
-      });
     } finally {
       setIsLoading(false);
     }
@@ -86,63 +83,6 @@ const MetricsPage = () => {
   const handleSaveForValidation = () => {
     if (sessionMetrics) {
       saveSessionMetricsForValidation(sessionMetrics);
-    }
-  };
-
-  const downloadSession = async () => {
-    if (!sessionId || !apiToken || !username) {
-      toast.error('Authentication required or session ID missing');
-      return;
-    }
-
-    try {
-      setIsDownloading(true);
-      const apiUrl = getApiUrl(environment);
-      
-      // Construct the proper download URL using the export endpoint
-      let url = `${apiUrl}/v1/sessions/export/sessions/${sessionId}`;
-      
-      // Add company ID as a query parameter if available
-      if (companyId) {
-        url += `?company=${companyId}`;
-      }
-      
-      console.log(`Downloading session with ID ${sessionId} from ${url}`);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': createBasicAuth(username, apiToken),
-          'Accept': '*/*'
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
-        throw new Error(`Download failed with status ${response.status}: ${errorText}`);
-      }
-      
-      // Handle the binary response (zip file)
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `session_${sessionId}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(downloadUrl);
-      document.body.removeChild(a);
-      
-      toast.success('Session downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading session:', error);
-      toast.error('Failed to download session', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-        duration: 5000
-      });
-    } finally {
-      setIsDownloading(false);
     }
   };
 
@@ -175,10 +115,9 @@ const MetricsPage = () => {
           <Button
             size="sm"
             variant="outline"
-            onClick={downloadSession}
-            disabled={!sessionMetrics || isLoading || isDownloading}
+            disabled={!sessionMetrics || isLoading}
           >
-            <Download className={`h-4 w-4 mr-2 ${isDownloading ? 'animate-spin' : ''}`} />
+            <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
           
@@ -205,8 +144,8 @@ const MetricsPage = () => {
           <div className="flex flex-col items-center space-y-4">
             <LineChartIcon className="h-12 w-12 text-muted-foreground" />
             <div className="text-center">
-              <p className="text-lg font-medium">Session data not found</p>
-              <p className="text-muted-foreground">The requested session could not be loaded. Please try again or select a different session.</p>
+              <p className="text-lg font-medium">No session selected</p>
+              <p className="text-muted-foreground">Select a session from the sessions page to view metrics.</p>
               <Button className="mt-4" onClick={() => navigate('/sessions')}>
                 Go to Sessions
               </Button>
