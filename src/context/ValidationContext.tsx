@@ -1,237 +1,223 @@
 
 import React, { createContext, useContext, useState } from 'react';
-import { toast } from "@/components/ui/sonner";
-import { SessionMetrics } from './SessionContext';
+import { toast } from "sonner";
+import { Session } from './SessionContext';
 
-// Type definitions
 export interface ValidationRule {
   id: string;
   name: string;
   description: string;
-  key: string; // The metric to check (fps, cpu, etc.)
-  operator: 'gt' | 'lt' | 'gte' | 'lte' | 'eq' | 'neq'; // greater than, less than, etc.
-  value: number; // The threshold value
-  enabled: boolean;
-}
-
-export interface ValidationRuleSet {
-  id: string;
-  name: string;
-  description: string;
-  rules: ValidationRule[];
+  property: string;
+  condition: 'greaterThan' | 'lessThan' | 'equals' | 'notEquals' | 'contains' | 'notContains';
+  value: string | number;
+  active: boolean;
 }
 
 export interface ValidationResult {
   sessionId: string;
-  ruleSetId: string;
-  timestamp: string;
-  overallStatus: 'pass' | 'fail';
-  results: {
+  appName: string;
+  deviceModel: string;
+  passed: boolean;
+  failures: {
     ruleId: string;
-    status: 'pass' | 'fail';
-    details: string;
+    ruleName: string;
+    property: string;
+    expected: string;
+    actual: string | number;
   }[];
 }
 
 interface ValidationContextType {
-  ruleSets: ValidationRuleSet[];
+  savedSessions: Session[];
+  rules: ValidationRule[];
   validationResults: ValidationResult[];
   isValidating: boolean;
-  createRuleSet: (ruleSet: Omit<ValidationRuleSet, 'id'>) => void;
-  updateRuleSet: (ruleSet: ValidationRuleSet) => void;
-  deleteRuleSet: (ruleSetId: string) => void;
-  validateSession: (sessionMetrics: SessionMetrics, ruleSetId: string) => Promise<ValidationResult>;
-  validateMultipleSessions: (sessionsMetrics: SessionMetrics[], ruleSetId: string) => Promise<ValidationResult[]>;
-  clearValidationResults: () => void;
+  saveSession: (session: Session) => void;
+  removeSavedSession: (sessionId: string) => void;
+  createRule: (rule: Omit<ValidationRule, 'id'>) => void;
+  updateRule: (rule: ValidationRule) => void;
+  deleteRule: (ruleId: string) => void;
+  validateSessions: (sessionIds: string[]) => Promise<void>;
+  clearResults: () => void;
 }
 
 const ValidationContext = createContext<ValidationContextType | undefined>(undefined);
 
-export const useValidation = () => {
+export const useValidationContext = () => {
   const context = useContext(ValidationContext);
   if (!context) {
-    throw new Error('useValidation must be used within a ValidationProvider');
+    throw new Error('useValidationContext must be used within a ValidationProvider');
   }
   return context;
 };
 
-// Helper function to evaluate a validation rule against a metric value
-const evaluateRule = (rule: ValidationRule, value: number): boolean => {
-  switch (rule.operator) {
-    case 'gt':
-      return value > rule.value;
-    case 'lt':
-      return value < rule.value;
-    case 'gte':
-      return value >= rule.value;
-    case 'lte':
-      return value <= rule.value;
-    case 'eq':
-      return value === rule.value;
-    case 'neq':
-      return value !== rule.value;
-    default:
-      return false;
-  }
-};
-
-// Generate a default rule set
-const defaultRuleSets: ValidationRuleSet[] = [
+// Default validation rules
+const defaultRules: ValidationRule[] = [
   {
-    id: 'default-ruleset',
-    name: 'Default Validation Rules',
-    description: 'Basic validation rules for GameBench sessions',
-    rules: [
-      {
-        id: 'fps-min',
-        name: 'Minimum FPS',
-        description: 'FPS should be greater than 0',
-        key: 'fps',
-        operator: 'gt',
-        value: 0,
-        enabled: true,
-      },
-      {
-        id: 'cpu-max',
-        name: 'Maximum CPU Usage',
-        description: 'CPU usage should be less than 90%',
-        key: 'cpu',
-        operator: 'lt',
-        value: 90,
-        enabled: true,
-      },
-      {
-        id: 'memory-max',
-        name: 'Maximum Memory Usage',
-        description: 'Memory usage should be less than 1000MB',
-        key: 'memory',
-        operator: 'lt',
-        value: 1000,
-        enabled: true,
-      },
-    ],
+    id: 'rule-1',
+    name: 'Positive FPS',
+    description: 'FPS values should be greater than or equal to zero',
+    property: 'metrics.fps.avg',
+    condition: 'greaterThan',
+    value: 0,
+    active: true,
+  },
+  {
+    id: 'rule-2',
+    name: 'FPS Stability',
+    description: 'FPS stability should be at least 80%',
+    property: 'metrics.fps.stability',
+    condition: 'greaterThan',
+    value: 80,
+    active: true,
   },
 ];
 
 export const ValidationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [ruleSets, setRuleSets] = useState<ValidationRuleSet[]>(defaultRuleSets);
+  const [savedSessions, setSavedSessions] = useState<Session[]>([]);
+  const [rules, setRules] = useState<ValidationRule[]>(defaultRules);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [isValidating, setIsValidating] = useState(false);
 
-  const createRuleSet = (ruleSet: Omit<ValidationRuleSet, 'id'>): void => {
-    const newRuleSet: ValidationRuleSet = {
-      ...ruleSet,
-      id: `ruleset-${Date.now()}`,
+  const saveSession = (session: Session) => {
+    if (savedSessions.some(s => s.id === session.id)) {
+      toast.info(`Session "${session.id}" already saved`);
+      return;
+    }
+    
+    setSavedSessions([...savedSessions, session]);
+    toast.success(`Session "${session.id}" saved for validation`);
+  };
+
+  const removeSavedSession = (sessionId: string) => {
+    setSavedSessions(savedSessions.filter(session => session.id !== sessionId));
+    toast.info(`Session "${sessionId}" removed from saved sessions`);
+  };
+
+  const createRule = (rule: Omit<ValidationRule, 'id'>) => {
+    const newRule: ValidationRule = {
+      ...rule,
+      id: `rule-${Date.now()}`,
     };
     
-    setRuleSets(prevRuleSets => [...prevRuleSets, newRuleSet]);
-    toast.success(`Rule set "${ruleSet.name}" created`);
+    setRules([...rules, newRule]);
+    toast.success(`Rule "${rule.name}" created`);
   };
 
-  const updateRuleSet = (ruleSet: ValidationRuleSet): void => {
-    setRuleSets(prevRuleSets =>
-      prevRuleSets.map(rs => (rs.id === ruleSet.id ? ruleSet : rs))
-    );
-    toast.success(`Rule set "${ruleSet.name}" updated`);
+  const updateRule = (updatedRule: ValidationRule) => {
+    setRules(rules.map(rule => 
+      rule.id === updatedRule.id ? updatedRule : rule
+    ));
+    toast.success(`Rule "${updatedRule.name}" updated`);
   };
 
-  const deleteRuleSet = (ruleSetId: string): void => {
-    setRuleSets(prevRuleSets => prevRuleSets.filter(rs => rs.id !== ruleSetId));
-    toast.success('Rule set deleted');
+  const deleteRule = (ruleId: string) => {
+    setRules(rules.filter(rule => rule.id !== ruleId));
+    toast.info(`Rule deleted`);
   };
 
-  const validateSession = async (sessionMetrics: SessionMetrics, ruleSetId: string): Promise<ValidationResult> => {
+  // Helper function to get nested property value from an object
+  const getNestedPropertyValue = (obj: any, path: string): any => {
+    return path.split('.').reduce((prev, curr) => {
+      return prev && prev[curr] !== undefined ? prev[curr] : undefined;
+    }, obj);
+  };
+
+  // Validate sessions against rules
+  const validateSessions = async (sessionIds: string[]) => {
+    if (rules.filter(rule => rule.active).length === 0) {
+      toast.error('No active validation rules found');
+      return;
+    }
+
+    if (sessionIds.length === 0) {
+      toast.error('No sessions selected for validation');
+      return;
+    }
+
     setIsValidating(true);
     
     try {
-      // Find the rule set
-      const ruleSet = ruleSets.find(rs => rs.id === ruleSetId);
-      if (!ruleSet) {
-        throw new Error(`Rule set with ID ${ruleSetId} not found`);
-      }
+      const results: ValidationResult[] = [];
       
-      // Apply rules to session metrics
-      const results = ruleSet.rules
-        .filter(rule => rule.enabled)
-        .map(rule => {
-          let status: 'pass' | 'fail' = 'fail';
-          let details = '';
+      // For each session that needs to be validated
+      for (const sessionId of sessionIds) {
+        const session = savedSessions.find(s => s.id === sessionId);
+        
+        if (!session) {
+          console.error(`Session ${sessionId} not found in saved sessions`);
+          continue;
+        }
+        
+        const failures = [];
+        
+        // Check each active rule against the session
+        for (const rule of rules.filter(r => r.active)) {
+          const actualValue = getNestedPropertyValue(session, rule.property);
           
-          // Get the appropriate metric value based on the rule key
-          if (rule.key === 'fps' && sessionMetrics.fps) {
-            // For array metrics like FPS, check if any value violates the rule
-            const violatingValues = sessionMetrics.fps.filter(v => !evaluateRule(rule, v));
-            status = violatingValues.length === 0 ? 'pass' : 'fail';
-            if (status === 'fail') {
-              details = `Found ${violatingValues.length} values that don't meet the criteria`;
-            }
-          } else if (rule.key === 'cpu' && sessionMetrics.cpu) {
-            const violatingValues = sessionMetrics.cpu.filter(v => !evaluateRule(rule, v));
-            status = violatingValues.length === 0 ? 'pass' : 'fail';
-            if (status === 'fail') {
-              details = `Found ${violatingValues.length} values that don't meet the criteria`;
-            }
-          } else if (rule.key === 'gpu' && sessionMetrics.gpu) {
-            const violatingValues = sessionMetrics.gpu.filter(v => !evaluateRule(rule, v));
-            status = violatingValues.length === 0 ? 'pass' : 'fail';
-            if (status === 'fail') {
-              details = `Found ${violatingValues.length} values that don't meet the criteria`;
-            }
-          } else if (rule.key === 'memory' && sessionMetrics.memory) {
-            const violatingValues = sessionMetrics.memory.filter(v => !evaluateRule(rule, v));
-            status = violatingValues.length === 0 ? 'pass' : 'fail';
-            if (status === 'fail') {
-              details = `Found ${violatingValues.length} values that don't meet the criteria`;
+          let passed = true;
+          
+          if (actualValue !== undefined) {
+            switch (rule.condition) {
+              case 'greaterThan':
+                passed = actualValue > rule.value;
+                break;
+              case 'lessThan':
+                passed = actualValue < rule.value;
+                break;
+              case 'equals':
+                passed = actualValue === rule.value;
+                break;
+              case 'notEquals':
+                passed = actualValue !== rule.value;
+                break;
+              case 'contains':
+                passed = String(actualValue).includes(String(rule.value));
+                break;
+              case 'notContains':
+                passed = !String(actualValue).includes(String(rule.value));
+                break;
             }
           } else {
-            status = 'fail';
-            details = 'Metric not available for validation';
+            // If the property doesn't exist, the rule fails
+            passed = false;
           }
           
-          return {
-            ruleId: rule.id,
-            status,
-            details,
-          };
+          if (!passed) {
+            failures.push({
+              ruleId: rule.id,
+              ruleName: rule.name,
+              property: rule.property,
+              expected: `${rule.condition} ${rule.value}`,
+              actual: actualValue !== undefined ? actualValue : 'undefined',
+            });
+          }
+        }
+        
+        results.push({
+          sessionId: session.id,
+          appName: session.app.name,
+          deviceModel: session.device.model,
+          passed: failures.length === 0,
+          failures,
         });
+      }
       
-      // Determine overall status
-      const overallStatus = results.every(r => r.status === 'pass') ? 'pass' : 'fail';
+      setValidationResults(results);
       
-      // Create validation result
-      const validationResult: ValidationResult = {
-        sessionId: sessionMetrics.sessionId,
-        ruleSetId,
-        timestamp: new Date().toISOString(),
-        overallStatus,
-        results,
-      };
+      const passedCount = results.filter(result => result.passed).length;
+      const failedCount = results.length - passedCount;
       
-      // Add to results
-      setValidationResults(prev => [...prev, validationResult]);
-      
-      return validationResult;
+      toast.success(`Validation complete: ${passedCount} passed, ${failedCount} failed`);
+    } catch (error) {
+      console.error('Error during validation:', error);
+      toast.error('Validation failed');
     } finally {
       setIsValidating(false);
     }
   };
 
-  const validateMultipleSessions = async (sessionsMetrics: SessionMetrics[], ruleSetId: string): Promise<ValidationResult[]> => {
-    setIsValidating(true);
-    
-    try {
-      const results = await Promise.all(
-        sessionsMetrics.map(metrics => validateSession(metrics, ruleSetId))
-      );
-      
-      toast.success(`Validated ${results.length} sessions`);
-      return results;
-    } finally {
-      setIsValidating(false);
-    }
-  };
-
-  const clearValidationResults = (): void => {
+  const clearResults = () => {
     setValidationResults([]);
     toast.info('Validation results cleared');
   };
@@ -239,15 +225,17 @@ export const ValidationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return (
     <ValidationContext.Provider
       value={{
-        ruleSets,
+        savedSessions,
+        rules,
         validationResults,
         isValidating,
-        createRuleSet,
-        updateRuleSet,
-        deleteRuleSet,
-        validateSession,
-        validateMultipleSessions,
-        clearValidationResults,
+        saveSession,
+        removeSavedSession,
+        createRule,
+        updateRule,
+        deleteRule,
+        validateSessions,
+        clearResults,
       }}
     >
       {children}

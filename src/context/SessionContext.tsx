@@ -1,155 +1,152 @@
 
 import React, { createContext, useContext, useState } from 'react';
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { useAuth } from './AuthContext';
 
-// Type definitions
+// Define session type based on GameBench API
 export interface Session {
   id: string;
-  appName: string;
-  appVersion: string;
-  deviceModel: string;
-  manufacturer: string;
-  recordedBy: string;
-  startTime: string;
-  duration: number;
-  selected?: boolean;
-}
-
-export interface SessionMetrics {
-  sessionId: string;
-  appDetails: {
+  app: {
     name: string;
     version: string;
     package: string;
   };
-  deviceDetails: {
-    manufacturer: string;
+  device: {
     model: string;
-    gpuType: string;
+    manufacturer: string;
   };
-  userDetails: {
-    email: string;
-    username: string;
+  metrics?: {
+    fps?: {
+      avg: number;
+      stability: number;
+    };
+    cpu?: {
+      avg: number;
+    };
+    memory?: {
+      avg: number;
+    };
+    battery?: {
+      drain: number;
+    };
   };
-  timestamp: string;
+  startTime: number;
   duration: number;
-  fps?: number[];
-  cpu?: number[];
-  gpu?: number[];
-  memory?: number[];
-  battery?: number[];
-  network?: {
-    upload: number[];
-    download: number[];
-  };
+  userEmail: string;
+  selected?: boolean;
 }
 
-interface DateRange {
-  from: Date;
-  to: Date;
+export interface SessionSearchParams {
+  dateStart?: number;
+  dateEnd?: number;
+  apps?: string[];
+  devices?: string[];
+  manufacturers?: string[];
+  page?: number;
+  pageSize?: number;
+  sort?: string;
 }
 
 interface SessionContextType {
   sessions: Session[];
-  selectedSessions: Session[];
-  sessionMetrics: SessionMetrics[];
   isLoading: boolean;
-  dateRange: DateRange;
-  searchQuery: string;
-  setDateRange: (range: DateRange) => void;
-  setSearchQuery: (query: string) => void;
-  fetchSessions: () => Promise<void>;
-  toggleSession: (sessionId: string, selected: boolean) => void;
-  toggleAllSessions: (selected: boolean) => void;
-  deleteSelectedSessions: () => Promise<void>;
-  downloadSelectedSessions: () => Promise<void>;
-  fetchSessionMetrics: (sessionId: string) => Promise<SessionMetrics | null>;
-  saveSessionMetricsForValidation: (metrics: SessionMetrics) => void;
+  totalSessions: number;
+  currentPage: number;
+  selectedSessions: Session[];
+  searchParams: SessionSearchParams;
+  fetchSessions: (params?: SessionSearchParams) => Promise<void>;
+  selectSession: (sessionId: string, selected: boolean) => void;
+  selectAllSessions: (selected: boolean) => void;
+  setSearchParams: (params: SessionSearchParams) => void;
+  resetSearchParams: () => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-export const useSession = () => {
+export const useSessionContext = () => {
   const context = useContext(SessionContext);
   if (!context) {
-    throw new Error('useSession must be used within a SessionProvider');
+    throw new Error('useSessionContext must be used within a SessionProvider');
   }
   return context;
 };
 
-// Mock data generator
-const generateMockSessions = (count: number): Session[] => {
-  const apps = ['GameBench Pro', 'Fortnite', 'PUBG Mobile', 'Call of Duty', 'Minecraft'];
-  const devices = ['iPhone 13 Pro', 'Samsung Galaxy S21', 'Google Pixel 6', 'iPad Pro', 'OnePlus 9'];
-  const manufacturers = ['Apple', 'Samsung', 'Google', 'Xiaomi', 'OnePlus'];
-  const users = ['user1@example.com', 'user2@example.com', 'user3@example.com'];
-  
-  return Array.from({ length: count }, (_, i) => ({
-    id: `session-${Date.now()}-${i}`,
-    appName: apps[Math.floor(Math.random() * apps.length)],
-    appVersion: `${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`,
-    deviceModel: devices[Math.floor(Math.random() * devices.length)],
-    manufacturer: manufacturers[Math.floor(Math.random() * manufacturers.length)],
-    recordedBy: users[Math.floor(Math.random() * users.length)],
-    startTime: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)).toISOString(),
-    duration: Math.floor(Math.random() * 3600), // duration in seconds
-    selected: false,
-  }));
-};
-
-// Mock metrics generator
-const generateMockMetrics = (sessionId: string): SessionMetrics => {
-  return {
-    sessionId,
-    appDetails: {
-      name: 'GameBench Pro',
-      version: '4.2.1',
-      package: 'com.gamebench.pro',
-    },
-    deviceDetails: {
-      manufacturer: 'Apple',
-      model: 'iPhone 13 Pro',
-      gpuType: 'Apple GPU',
-    },
-    userDetails: {
-      email: 'user@example.com',
-      username: 'testuser',
-    },
-    timestamp: new Date().toISOString(),
-    duration: 1800, // 30 minutes
-    fps: Array.from({ length: 30 }, () => Math.floor(30 + Math.random() * 30)),
-    cpu: Array.from({ length: 30 }, () => Math.floor(Math.random() * 100)),
-    gpu: Array.from({ length: 30 }, () => Math.floor(Math.random() * 100)),
-    memory: Array.from({ length: 30 }, () => Math.floor(100 + Math.random() * 900)),
-    battery: Array.from({ length: 30 }, () => 100 - Math.floor(Math.random() * 20)),
-    network: {
-      upload: Array.from({ length: 30 }, () => Math.floor(Math.random() * 5000)),
-      download: Array.from({ length: 30 }, () => Math.floor(Math.random() * 10000)),
-    },
-  };
+// Default search parameters
+const defaultSearchParams: SessionSearchParams = {
+  dateStart: undefined,
+  dateEnd: undefined,
+  apps: [],
+  devices: [],
+  manufacturers: [],
+  page: 0,
+  pageSize: 15,
+  sort: 'timePushed:desc',
 };
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { apiToken, companyId } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [sessionMetrics, setSessionMetrics] = useState<SessionMetrics[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-    to: new Date(),
-  });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [totalSessions, setTotalSessions] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [searchParams, setSearchParams] = useState<SessionSearchParams>(defaultSearchParams);
 
-  const selectedSessions = sessions.filter(session => session.selected);
+  // Mock function to fetch sessions - replace with actual API call
+  const fetchSessions = async (params?: SessionSearchParams) => {
+    if (!apiToken) {
+      toast.error('API Token is required');
+      return;
+    }
 
-  const fetchSessions = async (): Promise<void> => {
     setIsLoading(true);
+    
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // In a real implementation, this would call the GameBench API
+      // For now, we'll just simulate a response
+      const mergedParams = { ...searchParams, ...params };
+      setSearchParams(mergedParams);
       
-      // In a real application, this would be a fetch call to the GameBench API
-      const mockSessions = generateMockSessions(25);
+      // Simulated API response
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock data - replace with actual API call
+      const mockSessions: Session[] = Array(15).fill(null).map((_, index) => ({
+        id: `session-${index + 1}`,
+        app: {
+          name: `Test App ${index % 3 + 1}`,
+          version: `1.${index % 5}`,
+          package: `com.testapp.app${index % 3 + 1}`,
+        },
+        device: {
+          model: `Model ${['A', 'B', 'C'][index % 3]}`,
+          manufacturer: `Manufacturer ${['X', 'Y', 'Z'][index % 3]}`,
+        },
+        metrics: {
+          fps: {
+            avg: 55 + Math.random() * 5,
+            stability: 85 + Math.random() * 15,
+          },
+          cpu: {
+            avg: 25 + Math.random() * 15,
+          },
+          memory: {
+            avg: 250 + Math.random() * 100,
+          },
+          battery: {
+            drain: 0.5 + Math.random() * 1.5,
+          },
+        },
+        startTime: Date.now() - (index * 1000 * 60 * 60 * 24),
+        duration: 300 + Math.round(Math.random() * 600),
+        userEmail: `user${index % 3 + 1}@example.com`,
+        selected: false,
+      }));
+      
       setSessions(mockSessions);
+      setTotalSessions(100); // Mock total
+      setCurrentPage(mergedParams.page || 0);
+      
+      toast.success(`Loaded ${mockSessions.length} sessions`);
     } catch (error) {
       console.error('Error fetching sessions:', error);
       toast.error('Failed to fetch sessions');
@@ -158,120 +155,37 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const toggleSession = (sessionId: string, selected: boolean): void => {
-    setSessions(prevSessions =>
-      prevSessions.map(session =>
-        session.id === sessionId ? { ...session, selected } : session
-      )
-    );
+  const selectSession = (sessionId: string, selected: boolean) => {
+    setSessions(sessions.map(session => 
+      session.id === sessionId ? { ...session, selected } : session
+    ));
   };
 
-  const toggleAllSessions = (selected: boolean): void => {
-    setSessions(prevSessions =>
-      prevSessions.map(session => ({ ...session, selected }))
-    );
+  const selectAllSessions = (selected: boolean) => {
+    setSessions(sessions.map(session => ({ ...session, selected })));
   };
 
-  const deleteSelectedSessions = async (): Promise<void> => {
-    if (selectedSessions.length === 0) {
-      toast.warning('No sessions selected');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Remove selected sessions from state
-      setSessions(prevSessions =>
-        prevSessions.filter(session => !session.selected)
-      );
-      
-      toast.success(`${selectedSessions.length} sessions deleted successfully`);
-    } catch (error) {
-      console.error('Error deleting sessions:', error);
-      toast.error('Failed to delete sessions');
-    } finally {
-      setIsLoading(false);
-    }
+  const resetSearchParams = () => {
+    setSearchParams(defaultSearchParams);
   };
 
-  const downloadSelectedSessions = async (): Promise<void> => {
-    if (selectedSessions.length === 0) {
-      toast.warning('No sessions selected');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // In a real application, this would trigger downloads
-      toast.success(`Downloading ${selectedSessions.length} sessions`);
-    } catch (error) {
-      console.error('Error downloading sessions:', error);
-      toast.error('Failed to download sessions');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchSessionMetrics = async (sessionId: string): Promise<SessionMetrics | null> => {
-    setIsLoading(true);
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Generate mock metrics
-      const metrics = generateMockMetrics(sessionId);
-      return metrics;
-    } catch (error) {
-      console.error('Error fetching session metrics:', error);
-      toast.error('Failed to fetch session metrics');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const saveSessionMetricsForValidation = (metrics: SessionMetrics): void => {
-    // Check if metrics already exists and update or add
-    setSessionMetrics(prevMetrics => {
-      const index = prevMetrics.findIndex(m => m.sessionId === metrics.sessionId);
-      if (index >= 0) {
-        // Update existing metrics
-        const updatedMetrics = [...prevMetrics];
-        updatedMetrics[index] = metrics;
-        return updatedMetrics;
-      } else {
-        // Add new metrics
-        return [...prevMetrics, metrics];
-      }
-    });
-    
-    toast.success('Session metrics saved for validation');
-  };
+  // Compute selected sessions
+  const selectedSessions = sessions.filter(session => session.selected);
 
   return (
     <SessionContext.Provider
       value={{
         sessions,
-        selectedSessions,
-        sessionMetrics,
         isLoading,
-        dateRange,
-        searchQuery,
-        setDateRange,
-        setSearchQuery,
+        totalSessions,
+        currentPage,
+        selectedSessions,
+        searchParams,
         fetchSessions,
-        toggleSession,
-        toggleAllSessions,
-        deleteSelectedSessions,
-        downloadSelectedSessions,
-        fetchSessionMetrics,
-        saveSessionMetricsForValidation,
+        selectSession,
+        selectAllSessions,
+        setSearchParams,
+        resetSearchParams,
       }}
     >
       {children}
