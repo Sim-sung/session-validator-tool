@@ -1,114 +1,80 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
 } from '@/components/ui/card';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { toast } from 'sonner';
-import { 
-  PlusCircle, 
-  Trash, 
-  Save, 
-  Play, 
-  Check, 
-  X, 
-  FileDown,
-  RefreshCw,
-  CalendarIcon
-} from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/AuthContext';
 import { useSession } from '@/context/SessionContext';
-import { 
-  ValidationRule, 
-  MetricField, 
-  MetricCondition, 
+import {
+  ValidationRule,
+  ValidationResult,
   MetricOperator,
-  ValidationResult
+  MetricCondition,
 } from '@/types/validation';
-import { 
-  validateRule, 
-  getDefaultRules, 
-  getMetricFields, 
-  getConditionsForOperator,
-  getOperatorForField
-} from '@/utils/validationUtils';
-import { 
+import { validateRule, getDefaultRules, getMetricFields, getConditionsForOperator, getOperatorForField } from '@/utils/validationUtils';
+import { Check, Copy, Plus, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
+import { DateRange } from 'react-day-picker';
+import { Calendar } from '@/components/ui/calendar';
+import {
   Popover,
   PopoverContent,
-  PopoverTrigger
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { format } from 'date-fns';
+import { Calendar as CalendarIcon } from "lucide-react";
 
-const Validation = () => {
+const ValidationPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { sessions } = useSession();
-  
-  const [rules, setRules] = useState<ValidationRule[]>(getDefaultRules());
-  const [selectedRuleSet, setSelectedRuleSet] = useState<string>('Default Rules');
-  const [ruleSets] = useState<string[]>(['Default Rules', 'Performance Rules', 'Battery Rules']);
-  
-  const [newRule, setNewRule] = useState<Omit<ValidationRule, 'id'>>({
-    name: '',
-    field: 'fps.min',
-    operator: 'number',
-    condition: '>=',
-    value: 0,
-    enabled: true,
-    description: ''
-  });
-  
-  const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
-  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
-  const [isValidating, setIsValidating] = useState(false);
-  const [metricFields] = useState(getMetricFields());
-  const [selectedDateRange, setSelectedDateRange] = useState<{ from?: Date; to?: Date }>({});
 
-  // Create state for between value range
-  const [betweenValues, setBetweenValues] = useState<{ min: number | string; max: number | string }>({
-    min: 0,
-    max: 100
-  });
-
-  // Get conditions based on the selected operator
-  const [conditions, setConditions] = useState<{value: string; label: string}[]>(
-    getConditionsForOperator(newRule.operator)
-  );
+  const [rules, setRules] = useState<ValidationRule[]>([]);
+  const [results, setResults] = useState<ValidationResult[]>([]);
+  const [selectedRule, setSelectedRule] = useState<ValidationRule | null>(null);
+  const [isRuleFormOpen, setIsRuleFormOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: undefined,
+    to: undefined,
+  } as DateRange);
+  const [isAllRulesEnabled, setIsAllRulesEnabled] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -116,695 +82,547 @@ const Validation = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Update conditions when operator changes
   useEffect(() => {
-    setConditions(getConditionsForOperator(newRule.operator));
-    
-    // Reset condition when operator changes
-    setNewRule(prev => {
-      const newConditions = getConditionsForOperator(newRule.operator);
-      return {
-        ...prev,
-        condition: newConditions.length > 0 ? newConditions[0].value as MetricCondition : '>' as MetricCondition
-      };
-    });
-  }, [newRule.operator]);
+    const initialRules = getDefaultRules();
+    setRules(initialRules);
+  }, []);
 
-  // Update operator when field changes
-  const handleFieldChange = (fieldValue: string) => {
-    const operator = getOperatorForField(fieldValue);
-    setNewRule(prev => ({
-      ...prev,
-      field: fieldValue as MetricField,
-      operator
-    }));
+  useEffect(() => {
+    const allEnabled = rules.every(rule => rule.enabled);
+    setIsAllRulesEnabled(allEnabled);
+  }, [rules]);
+
+  const handleRuleClick = (rule: ValidationRule) => {
+    setSelectedRule(rule);
+    setIsRuleFormOpen(true);
   };
 
-  const addRule = () => {
-    if (!newRule.name) {
-      toast.error('Rule name is required');
-      return;
+  const handleEnableAllRules = () => {
+    const updatedRules = rules.map(rule => ({ ...rule, enabled: !isAllRulesEnabled }));
+    setRules(updatedRules);
+    setIsAllRulesEnabled(!isAllRulesEnabled);
+  };
+
+  const handleAddRule = () => {
+    setSelectedRule(null);
+    setIsRuleFormOpen(true);
+  };
+
+  const handleSaveRule = (newRule: ValidationRule) => {
+    if (newRule.id) {
+      // Update existing rule
+      const updatedRules = rules.map(rule => rule.id === newRule.id ? newRule : rule);
+      setRules(updatedRules);
+    } else {
+      // Add new rule
+      const newId = Math.random().toString(36).substring(7);
+      const completeNewRule = { ...newRule, id: newId };
+      setRules([...rules, completeNewRule]);
     }
-    
-    let ruleValue = newRule.value;
-    
-    // Handle 'between' condition
-    if (newRule.condition === 'between') {
-      if (newRule.operator === 'number') {
-        ruleValue = [Number(betweenValues.min), Number(betweenValues.max)];
-      } else if (newRule.operator === 'date') {
-        if (!selectedDateRange.from || !selectedDateRange.to) {
-          toast.error('Please select both start and end dates for the between condition');
-          return;
-        }
-        ruleValue = [
-          selectedDateRange.from.toISOString(),
-          selectedDateRange.to.toISOString()
-        ];
-      }
+    setIsRuleFormOpen(false);
+    setSelectedRule(null);
+    toast.success('Rule saved successfully!');
+  };
+
+  const handleDeleteRule = () => {
+    if (selectedRule) {
+      const updatedRules = rules.filter(rule => rule.id !== selectedRule.id);
+      setRules(updatedRules);
+      setIsRuleFormOpen(false);
+      setIsDeleteDialogOpen(false);
+      setSelectedRule(null);
+      toast.success('Rule deleted successfully!');
     }
-    
-    setRules([
-      ...rules,
-      {
-        ...newRule,
-        id: Date.now().toString(),
-        value: ruleValue
-      }
-    ]);
-    
-    // Reset form
-    setNewRule({
-      name: '',
-      field: 'fps.min',
-      operator: 'number',
-      condition: '>=',
-      value: 0,
-      enabled: true,
-      description: ''
-    });
-    setBetweenValues({ min: 0, max: 100 });
-    setSelectedDateRange({});
-    
-    toast.success('Rule added successfully');
   };
-  
-  const deleteRule = (id: string) => {
-    setRules(rules.filter(rule => rule.id !== id));
-    toast.success('Rule deleted');
-  };
-  
-  const toggleRuleStatus = (id: string, enabled: boolean) => {
-    setRules(rules.map(rule => 
-      rule.id === id ? { ...rule, enabled } : rule
-    ));
-  };
-  
-  const saveRuleSet = () => {
-    toast.success(`Rule set "${selectedRuleSet}" saved successfully`);
-  };
-  
-  const toggleSessionSelection = (sessionId: string) => {
-    setSelectedSessions(prev => 
-      prev.includes(sessionId)
-        ? prev.filter(id => id !== sessionId)
-        : [...prev, sessionId]
+
+  const handleToggleRule = (ruleId: string) => {
+    const updatedRules = rules.map(rule =>
+      rule.id === ruleId ? { ...rule, enabled: !rule.enabled } : rule
     );
+    setRules(updatedRules);
   };
 
-  const validateSessions = () => {
-    if (selectedSessions.length === 0) {
-      toast.error('Please select at least one session to validate');
+  const handleRunValidation = () => {
+    if (!sessions || sessions.length === 0) {
+      toast.error('No sessions available to validate.');
       return;
     }
-    
-    if (rules.filter(r => r.enabled).length === 0) {
-      toast.error('Please create and enable at least one rule');
-      return;
-    }
-    
-    setIsValidating(true);
-    
-    const results = selectedSessions.map(sessionId => {
-      const session = sessions.find(s => s.id === sessionId);
-      
-      if (!session) {
-        return {
-          sessionId,
-          appName: 'Unknown',
-          deviceModel: 'Unknown',
-          rules: [],
-          overallResult: 'fail' as const
-        };
-      }
 
-      const ruleResults = rules
-        .filter(rule => rule.enabled)
-        .map(rule => {
-          const passed = validateRule(session, rule);
-          const fieldValue = session[rule.field as keyof typeof session] || 
-                            getNestedProperty(session, rule.field as string);
-          
-          return {
-            ruleId: rule.id,
-            ruleName: rule.name,
-            passed,
-            field: rule.field,
-            operator: rule.operator,
-            expectedCondition: rule.condition,
-            expectedValue: rule.value,
-            actualValue: fieldValue,
-            description: rule.description
-          };
-        });
-      
+    const filteredSessions = sessions.filter(session => {
+      if (!dateRange?.from || !dateRange?.to) {
+        return true;
+      }
+      const sessionDate = new Date(session.startTime);
+      return sessionDate >= dateRange.from && sessionDate <= dateRange.to;
+    });
+
+    if (filteredSessions.length === 0) {
+      toast.error('No sessions match the selected date range.');
+      return;
+    }
+
+    const validationResults: ValidationResult[] = filteredSessions.map(session => {
+      const ruleResults = rules.map(rule => {
+        const passed = rule.enabled ? validateRule(session, rule) : true;
+        return {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          passed: passed,
+          field: rule.field,
+          operator: rule.operator,
+          expectedCondition: rule.condition,
+          expectedValue: rule.value,
+          actualValue: session[rule.field as keyof typeof session],
+          description: rule.description,
+        };
+      });
+
+      const overallResult = ruleResults.every(result => result.passed) ? 'pass' : 'fail';
+
       return {
-        sessionId,
-        appName: session.app?.name || 'Unknown',
-        deviceModel: session.device?.model || 'Unknown',
+        sessionId: session.id,
+        appName: session.appName,
+        deviceModel: session.deviceModel,
         rules: ruleResults,
-        overallResult: ruleResults.every(r => r.passed) ? 'pass' as const : 'fail' as const
+        overallResult: overallResult,
       };
     });
-    
-    setValidationResults(results);
-    setIsValidating(false);
-    
-    const passedCount = results.filter(r => r.overallResult === 'pass').length;
-    const failedCount = results.length - passedCount;
-    
-    toast.success(`Validation complete: ${passedCount} passed, ${failedCount} failed`);
-  };
-  
-  const exportResults = () => {
-    if (validationResults.length === 0) {
-      toast.error('No validation results to export');
-      return;
-    }
-    
-    // Format the results as a CSV string
-    const headers = "Session ID,App Name,Device Model,Rule Name,Rule Field,Rule Condition,Expected Value,Actual Value,Result\n";
-    const rows = validationResults.flatMap(result => 
-      result.rules.map(rule => 
-        `"${result.sessionId}","${result.appName}","${result.deviceModel}","${rule.ruleName}","${rule.field}","${rule.expectedCondition}","${formatValue(rule.expectedValue)}","${formatValue(rule.actualValue)}","${rule.passed ? 'PASS' : 'FAIL'}"`
-      )
-    ).join('\n');
-    
-    const csv = headers + rows;
-    
-    // Create and download the CSV file
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'validation_results.csv';
-    document.body.appendChild(a);
-    a.click();
-    
-    // Clean up
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    
-    toast.success('Validation results exported successfully');
+
+    setResults(validationResults);
+    toast.success('Validation completed!');
   };
 
-  // Helper function to format values for display/export
-  const formatValue = (value: any): string => {
-    if (value === null || value === undefined) {
-      return 'N/A';
-    }
-    
-    if (Array.isArray(value)) {
-      return value.join(' - ');
-    }
-    
-    return String(value);
+  const handleCopyRule = (rule: ValidationRule) => {
+    navigator.clipboard.writeText(JSON.stringify(rule, null, 2))
+      .then(() => {
+        toast.success('Rule copied to clipboard!');
+      })
+      .catch(() => {
+        toast.error('Failed to copy rule to clipboard.');
+      });
   };
 
-  // Helper function to get a nested property from an object using dot notation
-  const getNestedProperty = (obj: any, path: string): any => {
-    if (!obj || !path) return null;
-    const keys = path.split('.');
-    let value = obj;
-    for (const key of keys) {
-      if (value === null || value === undefined) return null;
-      value = value[key];
-    }
-    return value;
-  };
-  
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Validation Rules</h1>
-        <p className="text-muted-foreground">
-          Create and manage validation rules for your GameBench session data
-        </p>
-      </div>
-      
-      <Tabs defaultValue="rules" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="rules">Rule Management</TabsTrigger>
-          <TabsTrigger value="validate">Validate Sessions</TabsTrigger>
-          <TabsTrigger value="results">Validation Results</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="rules" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Rule Sets</CardTitle>
-              <CardDescription>
-                Manage your saved validation rule sets or create new ones
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="ruleset">Select Rule Set:</Label>
-                <select 
-                  id="ruleset"
-                  className="p-2 border rounded"
-                  value={selectedRuleSet}
-                  onChange={(e) => setSelectedRuleSet(e.target.value)}
-                >
-                  {ruleSets.map(set => (
-                    <option key={set} value={set}>{set}</option>
-                  ))}
-                </select>
-                <Button variant="outline" size="sm" onClick={saveRuleSet}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New Rule</CardTitle>
-              <CardDescription>
-                Define a new validation rule for your sessions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rule-name">Rule Name</Label>
-                  <Input 
-                    id="rule-name" 
-                    value={newRule.name}
-                    onChange={(e) => setNewRule({...newRule, name: e.target.value})}
-                    placeholder="e.g., Minimum FPS"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="metric">Metric Field</Label>
-                  <Select 
-                    value={newRule.field}
-                    onValueChange={handleFieldChange}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a metric" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(metricFields).map(([category, fields]) => (
-                        <SelectGroup key={category}>
-                          <SelectLabel>{category}</SelectLabel>
-                          {fields.map(field => (
-                            <SelectItem key={field.value} value={field.value}>
-                              {field.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="condition">Condition</Label>
-                  <Select
-                    value={newRule.condition}
-                    onValueChange={(value) => setNewRule({...newRule, condition: value as MetricCondition})}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {conditions.map(condition => (
-                        <SelectItem key={condition.value} value={condition.value}>
-                          {condition.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  {newRule.condition === 'between' ? (
-                    <div className="space-y-2">
-                      <Label>Range Values</Label>
-                      {newRule.operator === 'date' ? (
-                        <div className="flex flex-col space-y-2">
-                          <Label>Date Range</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="justify-start text-left font-normal"
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {selectedDateRange.from ? (
-                                  selectedDateRange.to ? (
-                                    <>
-                                      {format(selectedDateRange.from, "LLL dd, y")} -{" "}
-                                      {format(selectedDateRange.to, "LLL dd, y")}
-                                    </>
-                                  ) : (
-                                    format(selectedDateRange.from, "LLL dd, y")
-                                  )
-                                ) : (
-                                  <span>Pick a date range</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                initialFocus
-                                mode="range"
-                                defaultMonth={selectedDateRange.from}
-                                selected={selectedDateRange}
-                                onSelect={setSelectedDateRange}
-                                numberOfMonths={2}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      ) : (
-                        <div className="flex space-x-2">
-                          <div className="flex-1">
-                            <Label htmlFor="min-value">Min</Label>
-                            <Input 
-                              id="min-value" 
-                              type={newRule.operator === 'number' ? 'number' : 'text'}
-                              value={betweenValues.min}
-                              onChange={(e) => setBetweenValues({...betweenValues, min: e.target.value})}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <Label htmlFor="max-value">Max</Label>
-                            <Input 
-                              id="max-value" 
-                              type={newRule.operator === 'number' ? 'number' : 'text'}
-                              value={betweenValues.max}
-                              onChange={(e) => setBetweenValues({...betweenValues, max: e.target.value})}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    newRule.condition === 'exists' || 
-                    newRule.condition === 'notExists' || 
-                    newRule.condition === 'isEmpty' || 
-                    newRule.condition === 'isNotEmpty' ||
-                    newRule.condition === 'isTrue' ||
-                    newRule.condition === 'isFalse' ? (
-                      <div className="pt-6">
-                        <p className="text-sm text-muted-foreground">No value needed for this condition</p>
-                      </div>
-                    ) : (
-                      <>
-                        <Label htmlFor="value">Value</Label>
-                        {newRule.operator === 'boolean' ? (
-                          <Select
-                            value={String(newRule.value)}
-                            onValueChange={(value) => setNewRule({...newRule, value: value === 'true'})}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select a value" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="true">True</SelectItem>
-                              <SelectItem value="false">False</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : newRule.operator === 'date' ? (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-start text-left font-normal"
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {newRule.value instanceof Date ? (
-                                  format(newRule.value as Date, "PP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={new Date(newRule.value as string)}
-                                onSelect={(date) => date && setNewRule({...newRule, value: date.toISOString()})}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                          <Input 
-                            id="value" 
-                            type={newRule.operator === 'number' ? 'number' : 'text'}
-                            value={newRule.value as string | number}
-                            onChange={(e) => {
-                              const value = newRule.operator === 'number' 
-                                ? parseFloat(e.target.value) 
-                                : e.target.value;
-                              setNewRule({...newRule, value});
-                            }}
-                          />
-                        )}
-                      </>
-                    )
-                  )}
-                </div>
-                
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="description">Description (Optional)</Label>
-                  <Input 
-                    id="description" 
-                    value={newRule.description || ''}
-                    onChange={(e) => setNewRule({...newRule, description: e.target.value})}
-                    placeholder="Add a description for this rule"
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button onClick={addRule}>
-                <PlusCircle className="h-4 w-4 mr-2" />
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-semibold mb-4">Validation Rules</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Validation Rules List */}
+        <Card className="md:col-span-1">
+          <CardHeader>
+            <CardTitle>Rules</CardTitle>
+            <CardDescription>Manage your validation rules here.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Button variant="outline" size="sm" onClick={handleEnableAllRules}>
+                {isAllRulesEnabled ? 'Disable All' : 'Enable All'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleAddRule}>
+                <Plus className="h-4 w-4 mr-2" />
                 Add Rule
               </Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Rules</CardTitle>
-              <CardDescription>
-                View and manage your validation rules
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Enabled</TableHead>
-                    <TableHead>Rule Name</TableHead>
-                    <TableHead>Metric</TableHead>
-                    <TableHead>Condition</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rules.map(rule => (
-                    <TableRow key={rule.id}>
-                      <TableCell>
-                        <Switch 
-                          checked={rule.enabled}
-                          onCheckedChange={(checked) => toggleRuleStatus(rule.id, checked)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{rule.name}</div>
-                        {rule.description && (
-                          <div className="text-xs text-muted-foreground">{rule.description}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>{rule.field}</TableCell>
-                      <TableCell>{rule.condition}</TableCell>
-                      <TableCell>{formatValue(rule.value)}</TableCell>
-                      <TableCell>
-                        <Button variant="destructive" size="sm" onClick={() => deleteRule(rule.id)}>
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {rules.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">
-                        No rules defined. Create a new rule to get started.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="validate" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Select Sessions to Validate</CardTitle>
-              <CardDescription>
-                Choose the sessions you want to validate against your rules
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">Select</TableHead>
-                    <TableHead>App</TableHead>
-                    <TableHead>Device</TableHead>
-                    <TableHead>Recorded By</TableHead>
-                    <TableHead>Duration</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessions.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-4">
-                        No sessions found. Go to the Sessions page to fetch sessions.
-                      </TableCell>
-                    </TableRow>
+            </div>
+            <Separator />
+            <div className="overflow-auto h-[400px]">
+              {rules.map(rule => (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between p-2 rounded-md hover:bg-secondary cursor-pointer"
+                  onClick={() => handleRuleClick(rule)}
+                >
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id={`rule-${rule.id}`}
+                      checked={rule.enabled}
+                      onCheckedChange={() => handleToggleRule(rule.id)}
+                    />
+                    <Label htmlFor={`rule-${rule.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      {rule.name}
+                    </Label>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyRule(rule);
+                  }}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Validation Rule Form */}
+        <Card className="md:col-span-3">
+          <CardHeader>
+            <CardTitle>{selectedRule ? 'Edit Rule' : 'Add Rule'}</CardTitle>
+            <CardDescription>Define the rule for validating sessions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isRuleFormOpen && (
+              <ValidationRuleForm
+                rule={selectedRule}
+                onSave={handleSaveRule}
+                onCancel={() => {
+                  setIsRuleFormOpen(false);
+                  setSelectedRule(null);
+                }}
+                onDelete={() => setIsDeleteDialogOpen(true)}
+              />
+            )}
+            {!isRuleFormOpen && (
+              <div className="text-muted-foreground">
+                {rules.length === 0 ? 'No rules defined. Add a rule to get started.' : 'Select a rule to edit or add a new rule.'}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Validation Results */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Validation Results</h2>
+          <div className="flex items-center space-x-4">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={
+                    "w-[300px] justify-start text-left font-normal" +
+                    (dateRange?.from ? "pl-3.5" : "")
+                  }
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      format(dateRange.from, "LLL dd, y") + " - " + format(dateRange.to, "LLL dd, y")
+                    ) : (
+                      format(dateRange.from, "LLL dd, y")
+                    )
                   ) : (
-                    sessions.map((session) => (
-                      <TableRow key={session.id}>
-                        <TableCell>
-                          <Checkbox 
-                            checked={selectedSessions.includes(session.id)}
-                            onCheckedChange={() => toggleSessionSelection(session.id)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{session.appName}</div>
-                          <div className="text-xs text-muted-foreground">v{session.appVersion}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{session.deviceModel}</div>
-                          <div className="text-xs text-muted-foreground">{session.manufacturer}</div>
-                        </TableCell>
-                        <TableCell>{session.recordedBy}</TableCell>
-                        <TableCell>{Math.round(session.duration / 60)} min</TableCell>
-                      </TableRow>
-                    ))
+                    <span>Pick a date</span>
                   )}
-                </TableBody>
-              </Table>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <div className="text-sm text-muted-foreground">
-                {selectedSessions.length} sessions selected
-              </div>
-              <Button 
-                onClick={validateSessions} 
-                disabled={selectedSessions.length === 0 || isValidating}
-              >
-                {isValidating ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Validating...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Run Validation
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="results" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Validation Results</CardTitle>
-                  <CardDescription>
-                    Results of your validation rules against selected sessions
-                  </CardDescription>
-                </div>
-                <Button onClick={exportResults} disabled={validationResults.length === 0}>
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Export Results
                 </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {validationResults.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No validation results yet. Run validation to see results here.</p>
-                </div>
-              ) : (
-                <>
-                  {validationResults.map((result, index) => (
-                    <div key={result.sessionId} className="mb-6">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h3 className="font-semibold">
-                            {result.appName} on {result.deviceModel}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">Session ID: {result.sessionId}</p>
-                        </div>
-                        <div className={`px-3 py-1 rounded-full text-sm ${
-                          result.overallResult === 'pass' 
-                            ? 'bg-green-500/20 text-green-500' 
-                            : 'bg-red-500/20 text-red-500'
-                        }`}>
-                          {result.overallResult === 'pass' ? 'PASSED' : 'FAILED'}
-                        </div>
-                      </div>
-                      
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Rule</TableHead>
-                            <TableHead>Metric</TableHead>
-                            <TableHead>Expected</TableHead>
-                            <TableHead>Actual</TableHead>
-                            <TableHead>Result</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {result.rules.map((rule) => (
-                            <TableRow key={rule.ruleId}>
-                              <TableCell>{rule.ruleName}</TableCell>
-                              <TableCell>{rule.field}</TableCell>
-                              <TableCell>
-                                {rule.expectedCondition} {formatValue(rule.expectedValue)}
-                              </TableCell>
-                              <TableCell>{formatValue(rule.actualValue)}</TableCell>
-                              <TableCell>
-                                {rule.passed ? (
-                                  <Check className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <X className="h-4 w-4 text-red-500" />
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                      
-                      {index < validationResults.length - 1 && <Separator className="my-4" />}
-                    </div>
-                  ))}
-                </>
-              )}
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button onClick={handleRunValidation}>
+              <Check className="h-4 w-4 mr-2" />
+              Run Validation
+            </Button>
+          </div>
+        </div>
+        {results.length > 0 ? (
+          <ValidationResultsTable results={results} />
+        ) : (
+          <Card className="glass">
+            <CardContent className="flex flex-col items-center justify-center p-4">
+              <AlertTriangle className="h-10 w-10 text-yellow-500 mb-2" />
+              <p className="text-muted-foreground">No validation results yet. Run validation to see results.</p>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the rule.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteRule} className="bg-red-500 text-white hover:bg-red-600">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
 
-export default Validation;
+interface ValidationRuleFormProps {
+  rule: ValidationRule | null;
+  onSave: (rule: ValidationRule) => void;
+  onCancel: () => void;
+  onDelete?: () => void;
+}
+
+const ValidationRuleForm: React.FC<ValidationRuleFormProps> = ({ rule, onSave, onCancel, onDelete }) => {
+  const [name, setName] = useState(rule?.name || '');
+  const [field, setField] = useState(rule?.field || 'fps.min');
+  const [operator, setOperator] = useState<MetricOperator>(rule?.operator || 'number');
+  const [condition, setCondition] = useState<MetricCondition>(rule?.condition || '>=');
+  const [value, setValue] = useState(rule?.value !== undefined ? rule.value : 0);
+  const [enabled, setEnabled] = useState(rule?.enabled !== undefined ? rule.enabled : true);
+  const [description, setDescription] = useState(rule?.description || '');
+
+  const metricFields = getMetricFields();
+  const conditions = getConditionsForOperator(operator);
+
+  useEffect(() => {
+    if (rule) {
+      setName(rule.name);
+      setField(rule.field);
+      setOperator(rule.operator);
+      setCondition(rule.condition);
+      setValue(rule.value !== undefined ? rule.value : 0);
+      setEnabled(rule.enabled !== undefined ? rule.enabled : true);
+      setDescription(rule.description || '');
+    } else {
+      // Reset form fields when adding a new rule
+      setName('');
+      setField('fps.min');
+      setOperator('number');
+      setCondition('>=');
+      setValue(0);
+      setEnabled(true);
+      setDescription('');
+    }
+  }, [rule]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    let parsedValue: any = value;
+
+    // Parse value based on operator type
+    if (operator === 'number') {
+      if (condition === 'between') {
+        if (Array.isArray(value)) {
+          parsedValue = value.map(Number);
+        } else {
+          // Handle case where value is not an array when it should be
+          toast.error('Invalid value for "between" condition. Please provide an array.');
+          return;
+        }
+      } else {
+        parsedValue = Number(value);
+      }
+    } else if (operator === 'boolean') {
+      parsedValue = Boolean(value);
+    }
+
+    const newRule: ValidationRule = {
+      id: rule?.id || '',
+      name,
+      field,
+      operator,
+      condition,
+      value: parsedValue,
+      enabled,
+      description,
+    };
+
+    onSave(newRule);
+  };
+
+  const handleFieldChange = (newField: string) => {
+    setField(newField);
+    const newOperator = getOperatorForField(newField);
+    setOperator(newOperator);
+    setCondition(getConditionsForOperator(newOperator)[0].value as MetricCondition);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="name">Name</Label>
+        <Input
+          type="text"
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="field">Field</Label>
+        <Select value={field} onValueChange={handleFieldChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a field" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(metricFields).map(([category, fields]) => (
+              <React.Fragment key={category}>
+                <SelectItem disabled className="font-bold text-gray-500">
+                  {category}
+                </SelectItem>
+                {fields.map(f => (
+                  <SelectItem key={f.value} value={f.value}>
+                    {f.label}
+                  </SelectItem>
+                ))}
+              </React.Fragment>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="operator">Operator</Label>
+        <Select value={operator} onValueChange={(value) => {
+          setOperator(value as MetricOperator);
+          setCondition(getConditionsForOperator(value as MetricOperator)[0].value as MetricCondition);
+        }}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select an operator" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="number">Number</SelectItem>
+            <SelectItem value="string">String</SelectItem>
+            <SelectItem value="boolean">Boolean</SelectItem>
+            <SelectItem value="date">Date</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="condition">Condition</Label>
+        <Select value={condition} onValueChange={(value) => setCondition(value as MetricCondition)}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a condition" />
+          </SelectTrigger>
+          <SelectContent>
+            {conditions.map(c => (
+              <SelectItem key={c.value} value={c.value}>
+                {c.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="value">Value</Label>
+        {operator === 'number' && condition === 'between' ? (
+          <div className="flex space-x-2">
+            <Input
+              type="number"
+              placeholder="Min"
+              value={Array.isArray(value) ? value[0] : 0}
+              onChange={(e) => {
+                const newValue = Number(e.target.value);
+                setValue(Array.isArray(value) ? [newValue, value[1]] : [newValue, 0]);
+              }}
+            />
+            <Input
+              type="number"
+              placeholder="Max"
+              value={Array.isArray(value) ? value[1] : 0}
+              onChange={(e) => {
+                const newValue = Number(e.target.value);
+                setValue(Array.isArray(value) ? [value[0], newValue] : [0, newValue]);
+              }}
+            />
+          </div>
+        ) : (
+          <Input
+            type={operator === 'number' ? 'number' : 'text'}
+            id="value"
+            value={value !== null ? value : ''}
+            onChange={(e) => setValue(operator === 'number' ? Number(e.target.value) : e.target.value)}
+          />
+        )}
+      </div>
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+      <div className="flex items-center space-x-2">
+        <Label htmlFor="enabled">Enabled</Label>
+        <Switch
+          id="enabled"
+          checked={enabled}
+          onCheckedChange={(checked) => setEnabled(checked)}
+        />
+      </div>
+      <div className="flex justify-between">
+        <div>
+          {onDelete && rule?.id && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          )}
+        </div>
+        <div className="flex space-x-2">
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit">Save</Button>
+        </div>
+      </div>
+    </form>
+  );
+};
+
+interface ValidationResultsTableProps {
+  results: ValidationResult[];
+}
+
+const ValidationResultsTable: React.FC<ValidationResultsTableProps> = ({ results }) => {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Session</TableHead>
+          <TableHead>App</TableHead>
+          <TableHead>Device</TableHead>
+          <TableHead>Rule</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Expected</TableHead>
+          <TableHead>Actual</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {results.map(result => (
+          result.rules.map(rule => (
+            <TableRow key={`${result.sessionId}-${rule.ruleId}`}>
+              <TableCell>{result.sessionId}</TableCell>
+              <TableCell>{result.appName}</TableCell>
+              <TableCell>{result.deviceModel}</TableCell>
+              <TableCell>{rule.ruleName}</TableCell>
+              <TableCell>
+                {rule.passed ? (
+                  <div className="flex items-center">
+                    <Check className="h-4 w-4 text-green-500 mr-1" />
+                    Passed
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <AlertTriangle className="h-4 w-4 text-red-500 mr-1" />
+                    Failed
+                  </div>
+                )}
+              </TableCell>
+              <TableCell>
+                {rule.expectedCondition} {JSON.stringify(rule.expectedValue)}
+              </TableCell>
+              <TableCell>{JSON.stringify(rule.actualValue)}</TableCell>
+            </TableRow>
+          ))
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+export default ValidationPage;

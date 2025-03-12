@@ -1,15 +1,13 @@
-
 export type MetricCondition = 
   // Numeric conditions
   | '>' | '>=' | '<' | '<=' | '==' | '!=' | 'between'
   // String conditions
-  | 'equals' | 'notEquals' | 'contains' | 'notContains' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty' | 'matches'
+  | 'equals' | 'notEquals' | 'contains' | 'notContains' | 'startsWith' 
+  | 'endsWith' | 'isEmpty' | 'isNotEmpty' | 'matches' | 'exists' | 'notExists'
   // Boolean conditions
   | 'isTrue' | 'isFalse'
   // Date conditions
-  | 'before' | 'after' | 'on'
-  // General conditions
-  | 'exists' | 'notExists';
+  | 'before' | 'after' | 'on';
 
 export type MetricOperator = 'number' | 'string' | 'boolean' | 'date';
 
@@ -55,6 +53,98 @@ export type MetricField =
   | 'tags.githash' | 'tags.injected'
   // Allow any string as a field (for dynamic field access)
   | string;
+
+export interface Session {
+  id: string;
+  uuid: string;
+  app?: {
+    name: string;
+    packageName: string;
+    version: string;
+    versionCode: number;
+  };
+  device?: {
+    model: string;
+    manufacturer: string;
+    batteryCapacity?: number;
+    batteryVoltage?: number;
+    screenWidth?: number;
+    screenHeight?: number;
+    refreshRate?: number;
+    androidVersionRelease?: string;
+    androidSdkInt?: number;
+    baseband?: string;
+    gpu?: {
+      vendor: string;
+      renderer: string;
+    };
+    cpu?: {
+      numCores: number;
+      maxFreq: number;
+      minFreq: number;
+    };
+  };
+  user?: {
+    userPlayAccount: string;
+    dataSet: string;
+  };
+  tags?: {
+    githash: string;
+    injected: string;
+  };
+  fpsMin?: number;
+  fpsMax?: number;
+  fpsMedian?: number;
+  fpsStability?: number;
+  fpsOnePercentLow?: number;
+  cpuUsageMin?: number;
+  cpuUsageMax?: number;
+  cpuUsageMedian?: number;
+  cpuUsageAvg?: number;
+  totalCpuUsageAvg?: number;
+  gpuUsageMin?: number;
+  gpuUsageMax?: number;
+  gpuUsageMedian?: number;
+  gpuUsageAvg?: number;
+  memUsageMin?: number;
+  memUsageMax?: number;
+  memUsageMedian?: number;
+  memUsageAvg?: number;
+  androidMemUsageMin?: number;
+  androidMemUsageMax?: number;
+  androidMemUsageMedian?: number;
+  androidMemUsageAvg?: number;
+  firstBat?: number;
+  lastBat?: number;
+  powerUsage?: number;
+  mWAvg?: number;
+  mAh?: number;
+  mAAvg?: number;
+  bigJanksCount?: number;
+  bigJanks10Mins?: number;
+  smallJanksCount?: number;
+  smallJanks10Mins?: number;
+  janksCount?: number;
+  janks10Mins?: number;
+  appSize?: number;
+  appCache?: number;
+  appData?: number;
+  appLaunchTimeMs?: number;
+  timePlayed?: number;
+  sessionDate?: number;
+  timePushed?: number;
+  isActive?: boolean;
+  isCharging?: boolean;
+  selected: boolean;
+  startTime: number;
+  duration: number;
+  manufacturer: string;
+  appVersion: string;
+  networkAppUsage?: {
+    appTotalDataReceived: number;
+    appTotalDataSent: number;
+  };
+}
 
 export interface ValidationRule {
   id: string;
