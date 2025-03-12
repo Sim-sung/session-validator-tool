@@ -23,3 +23,6 @@ export const ENVIRONMENT_OPTIONS = [
   { label: 'Production', value: 'https://web.gamebench.net' },
   { label: 'QA', value: 'https://gb-v2-30-0.qa.gbdev.tech' }
 ];
+
+// Export ENVIRONMENT_OPTIONS as environments for backward compatibility
+export const environments = ENVIRONMENT_OPTIONS;
